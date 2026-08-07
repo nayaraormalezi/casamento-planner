@@ -28,9 +28,27 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  const [statusMsg, setStatusMsg] = useState("Preparando orçamento…");
+
   useEffect(() => {
     if (!hydrated) void hydrate();
   }, [hydrated, hydrate]);
+
+  useEffect(() => {
+    if (step !== 7) return;
+    const messages = [
+      "Preparando orçamento…",
+      "Organizando categorias…",
+      "Montando checklist…",
+      "Quase lá…",
+    ];
+    let i = 0;
+    const id = setInterval(() => {
+      i = (i + 1) % messages.length;
+      setStatusMsg(messages[i]);
+    }, 1200);
+    return () => clearInterval(id);
+  }, [step]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -68,8 +86,8 @@ export default function OnboardingPage() {
         setStep(6);
         return;
       }
-      router.push("/app/dashboard");
-      router.refresh();
+      // Hard navigation avoids stale client/server mismatch after onboarding.
+      window.location.assign("/app/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro no onboarding");
       setStep(6);
@@ -242,9 +260,10 @@ export default function OnboardingPage() {
             <h1 className="font-display text-2xl font-semibold">
               Montando seu plano…
             </h1>
-            <p className="text-ink-tertiary">
-              Categorias de orçamento e checklist por fases.
-            </p>
+            <p className="text-ink-tertiary">{statusMsg}</p>
+            <div className="h-1.5 overflow-hidden rounded-full bg-canvas-muted">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-accent" />
+            </div>
           </div>
         )}
       </div>

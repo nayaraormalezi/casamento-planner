@@ -130,6 +130,7 @@ export default function AiPage() {
           vendorId: null,
           budgetItemId: null,
           templateKey: "ai.music_list",
+          budgetOptions: [],
         },
         {
           id: `task_${Math.random().toString(36).slice(2, 8)}`,
@@ -146,6 +147,7 @@ export default function AiPage() {
           vendorId: null,
           budgetItemId: null,
           templateKey: "ai.menu_tasting",
+          budgetOptions: [],
         },
       ];
       extras.forEach(upsertTask);

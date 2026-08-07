@@ -12,8 +12,7 @@ import { cn } from "@/utils/cn";
 const columns: { status: TaskStatus; label: string }[] = [
   { status: "todo", label: "A fazer" },
   { status: "doing", label: "Em andamento" },
-  { status: "blocked", label: "Bloqueadas" },
-  { status: "done", label: "Concluídas" },
+  { status: "done", label: "Concluído" },
 ];
 
 export default function SchedulePage() {
@@ -25,11 +24,9 @@ export default function SchedulePage() {
     const map: Record<string, typeof workspace.tasks> = {
       todo: [],
       doing: [],
-      blocked: [],
       done: [],
     };
     for (const t of workspace.tasks) {
-      if (t.status === "cancelled") continue;
       map[t.status]?.push(t);
     }
     return map;
@@ -126,7 +123,7 @@ export default function SchedulePage() {
         <TabsContent value="timeline">
           <div className="space-y-3">
             {workspace.tasks
-              .filter((t) => t.status !== "cancelled")
+              .slice()
               .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))
               .slice(0, 20)
               .map((t) => (

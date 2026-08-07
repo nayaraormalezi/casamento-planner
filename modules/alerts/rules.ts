@@ -58,7 +58,6 @@ export function buildAlerts(ws: WeddingWorkspace): AppAlert[] {
   for (const task of ws.tasks) {
     if (
       task.status === "done" ||
-      task.status === "cancelled" ||
       !task.dueDate ||
       task.dueDate >= today
     )

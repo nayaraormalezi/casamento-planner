@@ -5,7 +5,13 @@ import type {
   Gift,
   Guest,
   HoneymoonItem,
+  PaymentMethod,
+  PaymentPlan,
+  PaymentStatus,
   Task,
+  TaskBudgetInstallment,
+  TaskBudgetOption,
+  TaskStatus,
   Vendor,
   WeddingWorkspace,
 } from "@/types/domain";
@@ -17,6 +23,8 @@ import type {
   Guest as PGuest,
   HoneymoonItem as PHoneymoon,
   Task as PTask,
+  TaskBudgetInstallment as PInstallment,
+  TaskBudgetOption as POption,
   Vendor as PVendor,
   Wedding,
   BudgetCategory,
@@ -27,12 +35,22 @@ function dateStr(d: Date | null | undefined): string | null {
   return d.toISOString().slice(0, 10);
 }
 
+function mapTaskStatus(status: string): TaskStatus {
+  if (status === "doing") return "doing";
+  if (status === "done") return "done";
+  return "todo";
+}
+
+type TaskWithOptions = PTask & {
+  budgetOptions?: (POption & { installments?: PInstallment[] })[];
+};
+
 export function mapWorkspace(input: {
   wedding: Wedding;
   categories: BudgetCategory[];
   budgetItems: PBudgetItem[];
   vendors: PVendor[];
-  tasks: PTask[];
+  tasks: TaskWithOptions[];
   guests: PGuest[];
   gifts: PGift[];
   decisions: PDecision[];
@@ -105,7 +123,43 @@ function mapVendor(v: PVendor): Vendor {
   };
 }
 
-function mapTask(t: PTask): Task {
+function mapInstallment(i: PInstallment): TaskBudgetInstallment {
+  return {
+    id: i.id,
+    sequence: i.sequence,
+    amount: i.amount,
+    dueDate: dateStr(i.dueDate),
+    paidAt: i.paidAt ? i.paidAt.toISOString() : null,
+    paymentMethod: (i.paymentMethod as PaymentMethod | null) ?? null,
+    notes: i.notes ?? "",
+  };
+}
+
+function mapBudgetOption(
+  o: POption & { installments?: PInstallment[] },
+): TaskBudgetOption {
+  return {
+    id: o.id,
+    taskId: o.taskId,
+    title: o.title,
+    vendorId: o.vendorId,
+    vendorName: o.vendorName ?? "",
+    amount: o.amount,
+    notes: o.notes ?? "",
+    isSelected: o.isSelected,
+    paymentPlan: o.paymentPlan as PaymentPlan,
+    paymentStatus: o.paymentStatus as PaymentStatus,
+    paidAmount: o.paidAmount,
+    nextPaymentDate: dateStr(o.nextPaymentDate),
+    installmentCount: o.installmentCount,
+    installments: (o.installments ?? [])
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence)
+      .map(mapInstallment),
+  };
+}
+
+function mapTask(t: TaskWithOptions): Task {
   return {
     id: t.id,
     title: t.title,
@@ -115,12 +169,13 @@ function mapTask(t: PTask): Task {
     priority: t.priority as Task["priority"],
     dueDate: dateStr(t.dueDate),
     startDate: dateStr(t.startDate),
-    status: t.status,
+    status: mapTaskStatus(t.status),
     isMilestone: t.isMilestone,
     assignee: t.assigneeId,
     vendorId: t.vendorId,
     budgetItemId: t.budgetItemId,
     templateKey: t.templateKey,
+    budgetOptions: (t.budgetOptions ?? []).map(mapBudgetOption),
   };
 }
 

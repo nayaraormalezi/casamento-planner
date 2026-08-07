@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { PriorityBadge } from "@/components/shared/priority-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -25,8 +27,19 @@ import {
 } from "@/components/ui/sheet";
 import { useWeddingStore } from "@/lib/demo/store";
 import { composeDashboard, currentPhase } from "@/modules/budget/calculations";
-import type { Priority, Task, TaskPhase, TaskStatus } from "@/types/domain";
-import { cn } from "@/utils/cn";
+import { estimateTaskSpend } from "@/modules/tasks/estimates";
+import { moduleForTask, PHASE_LABEL } from "@/modules/tasks/module-links";
+import type {
+  PaymentPlan,
+  PaymentStatus,
+  Priority,
+  Task,
+  TaskBudgetInstallment,
+  TaskBudgetOption,
+  TaskPhase,
+  TaskStatus,
+} from "@/types/domain";
+import { cn, formatMoneyBRL } from "@/utils/cn";
 
 const phases: TaskPhase[] = [
   "m18",
@@ -43,23 +56,60 @@ const phases: TaskPhase[] = [
   "honeymoon",
 ];
 
-const phaseLabel: Record<TaskPhase, string> = {
-  m18: "18m",
-  m12: "12m",
-  m9: "9m",
-  m6: "6m",
-  m3: "3m",
-  m1: "1m",
-  d15: "15d",
-  d7: "7d",
-  d3: "3d",
-  day_of: "Dia",
-  post: "Pós",
-  honeymoon: "Lua",
-};
+const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
+  { value: "todo", label: "A fazer" },
+  { value: "doing", label: "Em andamento" },
+  { value: "done", label: "Concluído" },
+];
 
-function newId() {
-  return `task_${Math.random().toString(36).slice(2, 10)}`;
+function newId(prefix: string) {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function emptyOption(taskId: string): TaskBudgetOption {
+  return {
+    id: newId("opt"),
+    taskId,
+    title: "",
+    vendorId: null,
+    vendorName: "",
+    amount: 0,
+    notes: "",
+    isSelected: false,
+    paymentPlan: "lump_sum",
+    paymentStatus: "unpaid",
+    paidAmount: 0,
+    nextPaymentDate: null,
+    installmentCount: 2,
+    installments: [],
+  };
+}
+
+function buildInstallments(
+  count: number,
+  totalCents: number,
+  firstDue: string | null,
+): TaskBudgetInstallment[] {
+  const n = Math.max(1, count);
+  const base = Math.floor(totalCents / n);
+  const remainder = totalCents - base * n;
+  return Array.from({ length: n }, (_, i) => {
+    let dueDate: string | null = null;
+    if (firstDue) {
+      const d = new Date(firstDue + "T12:00:00");
+      d.setMonth(d.getMonth() + i);
+      dueDate = d.toISOString().slice(0, 10);
+    }
+    return {
+      id: newId("inst"),
+      sequence: i + 1,
+      amount: base + (i === 0 ? remainder : 0),
+      dueDate,
+      paidAt: null,
+      paymentMethod: null,
+      notes: "",
+    };
+  });
 }
 
 export default function TasksPage() {
@@ -82,10 +132,7 @@ export default function TasksPage() {
     if (filter === "overdue")
       list = list.filter(
         (t) =>
-          t.status !== "done" &&
-          t.status !== "cancelled" &&
-          t.dueDate != null &&
-          t.dueDate < today,
+          t.status !== "done" && t.dueDate != null && t.dueDate < today,
       );
     if (filter === "done") list = list.filter((t) => t.status === "done");
     return list.sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""));
@@ -93,7 +140,7 @@ export default function TasksPage() {
 
   function openNew() {
     setDraft({
-      id: newId(),
+      id: newId("task"),
       title: "",
       description: "",
       phase: currentPhase(dash.daysRemaining),
@@ -107,6 +154,7 @@ export default function TasksPage() {
       vendorId: null,
       budgetItemId: null,
       templateKey: null,
+      budgetOptions: [],
     });
     setOpen(true);
   }
@@ -118,11 +166,39 @@ export default function TasksPage() {
     });
   }
 
+  function updateOption(
+    optionId: string,
+    patch: Partial<TaskBudgetOption>,
+  ) {
+    if (!draft) return;
+    setDraft({
+      ...draft,
+      budgetOptions: draft.budgetOptions.map((o) =>
+        o.id === optionId ? { ...o, ...patch } : o,
+      ),
+    });
+  }
+
+  function selectOption(optionId: string) {
+    if (!draft) return;
+    const selected = draft.budgetOptions.find((o) => o.id === optionId);
+    setDraft({
+      ...draft,
+      vendorId: selected?.vendorId ?? draft.vendorId,
+      budgetOptions: draft.budgetOptions.map((o) => ({
+        ...o,
+        isSelected: o.id === optionId,
+      })),
+    });
+  }
+
+  const selectedOption = draft?.budgetOptions.find((o) => o.isSelected);
+
   return (
     <div>
       <PageHeader
         title="Tarefas"
-        description={`Fase atual: ${phaseLabel[dash.phase]} · ${dash.tasks.total - dash.tasks.done} abertas · ${dash.tasks.overdue} atrasadas`}
+        description={`Fase atual: ${PHASE_LABEL[dash.phase]} · ${dash.tasks.total - dash.tasks.done} abertas · ${dash.tasks.overdue} atrasadas`}
         actions={<Button onClick={openNew}>Nova</Button>}
       />
 
@@ -165,7 +241,7 @@ export default function TasksPage() {
                 : "bg-canvas-muted text-ink-secondary hover:text-ink",
             )}
           >
-            {phaseLabel[p]}
+            {PHASE_LABEL[p].split(" ")[0]}
           </button>
         ))}
       </div>
@@ -176,53 +252,93 @@ export default function TasksPage() {
             task.status !== "done" &&
             task.dueDate != null &&
             task.dueDate < today;
+          const estimate = estimateTaskSpend(task, workspace);
+          const mod = moduleForTask(task);
+          const chosen = task.budgetOptions.find((o) => o.isSelected);
+
           return (
             <li
               key={task.id}
-              className="flex items-center gap-3 rounded-lg border border-border bg-canvas-elevated px-4 py-3"
+              className="rounded-lg border border-border bg-canvas-elevated px-4 py-3"
             >
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-[var(--wp-accent)]"
-                checked={task.status === "done"}
-                onChange={() => toggleDone(task)}
-              />
-              <button
-                type="button"
-                className="min-w-0 flex-1 text-left"
-                onClick={() => {
-                  setDraft({ ...task });
-                  setOpen(true);
-                }}
-              >
-                <p
-                  className={cn(
-                    "text-sm font-medium",
-                    task.status === "done" && "text-ink-tertiary line-through",
-                  )}
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 accent-[var(--wp-accent)]"
+                  checked={task.status === "done"}
+                  onChange={() => toggleDone(task)}
+                />
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => {
+                    setDraft({
+                      ...task,
+                      budgetOptions: task.budgetOptions ?? [],
+                    });
+                    setOpen(true);
+                  }}
                 >
-                  {task.title}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-tertiary">
-                  {task.dueDate ?? "Sem prazo"}
-                  {overdue ? " · atrasada" : ""}
-                </p>
-              </button>
-              <PriorityBadge priority={task.priority} />
-              <StatusBadge status={task.status} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p
+                      className={cn(
+                        "text-sm font-medium",
+                        task.status === "done" &&
+                          "text-ink-tertiary line-through",
+                      )}
+                    >
+                      {task.title}
+                    </p>
+                    <PriorityBadge priority={task.priority} />
+                    <StatusBadge status={task.status} />
+                    {chosen ? (
+                      <StatusBadge status={chosen.paymentStatus} />
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 text-xs text-ink-tertiary">
+                    {task.dueDate ?? "Sem prazo"}
+                    {overdue ? " · atrasada" : ""}
+                    {" · "}
+                    {mod.label}
+                    {task.budgetOptions.length
+                      ? ` · ${task.budgetOptions.length} orçamento(s)`
+                      : ""}
+                  </p>
+                  {chosen ? (
+                    <p className="mt-1 text-xs tabular-nums text-ink-secondary">
+                      Definido: {chosen.title || "Orçamento"} ·{" "}
+                      {formatMoneyBRL(chosen.amount)}
+                      {chosen.paymentPlan === "installments"
+                        ? " · parcelado"
+                        : " · à vista"}
+                      {" · pago "}
+                      {formatMoneyBRL(chosen.paidAmount)}
+                    </p>
+                  ) : estimate.estimatedCents > 0 ? (
+                    <p className="mt-1 text-xs tabular-nums text-ink-secondary">
+                      Estimativa {formatMoneyBRL(estimate.estimatedCents)}
+                    </p>
+                  ) : null}
+                </button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={mod.href} aria-label={mod.actionLabel}>
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </li>
           );
         })}
       </ul>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent>
+        <SheetContent className="sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>Tarefa</SheetTitle>
           </SheetHeader>
           {draft ? (
             <>
-              <SheetBody className="space-y-4">
+              <SheetBody className="space-y-5">
                 <div className="space-y-2">
                   <Label>Título</Label>
                   <Input
@@ -232,27 +348,8 @@ export default function TasksPage() {
                     }
                   />
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Fase</Label>
-                    <Select
-                      value={draft.phase}
-                      onValueChange={(v) =>
-                        setDraft({ ...draft, phase: v as TaskPhase })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {phases.map((p) => (
-                          <SelectItem key={p} value={p}>
-                            {phaseLabel[p]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="space-y-2">
                     <Label>Status</Label>
                     <Select
@@ -265,24 +362,14 @@ export default function TasksPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {(
-                          [
-                            "todo",
-                            "doing",
-                            "blocked",
-                            "done",
-                            "cancelled",
-                          ] as TaskStatus[]
-                        ).map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
+                        {TASK_STATUSES.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>
+                            {s.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Prioridade</Label>
                     <Select
@@ -306,6 +393,29 @@ export default function TasksPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Fase</Label>
+                    <Select
+                      value={draft.phase}
+                      onValueChange={(v) =>
+                        setDraft({ ...draft, phase: v as TaskPhase })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {phases.map((p) => (
+                          <SelectItem key={p} value={p}>
+                            {PHASE_LABEL[p]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label>Prazo</Label>
                     <Input
@@ -320,6 +430,439 @@ export default function TasksPage() {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <Select
+                    value={draft.categorySlug ?? "__none"}
+                    onValueChange={(v) =>
+                      setDraft({
+                        ...draft,
+                        categorySlug: v === "__none" ? null : v,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sem categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Sem categoria</SelectItem>
+                      {workspace.categories.map((c) => (
+                        <SelectItem key={c.slug} value={c.slug}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-3 border-t border-border pt-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">Opções de orçamento</p>
+                      <p className="text-xs text-ink-tertiary">
+                        Cadastre cotas e escolha a definida.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          budgetOptions: [
+                            ...draft.budgetOptions,
+                            emptyOption(draft.id),
+                          ],
+                        })
+                      }
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Opção
+                    </Button>
+                  </div>
+
+                  {draft.budgetOptions.length > 0 ? (
+                    <div className="space-y-2">
+                      <Label>Orçamento definido</Label>
+                      <Select
+                        value={selectedOption?.id ?? "__none"}
+                        onValueChange={(v) => {
+                          if (v === "__none") {
+                            setDraft({
+                              ...draft,
+                              budgetOptions: draft.budgetOptions.map((o) => ({
+                                ...o,
+                                isSelected: false,
+                              })),
+                            });
+                            return;
+                          }
+                          selectOption(v);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a opção definida" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">Nenhum definido</SelectItem>
+                          {draft.budgetOptions.map((o) => (
+                            <SelectItem key={o.id} value={o.id}>
+                              {(o.title || "Sem título") +
+                                ` · ${formatMoneyBRL(o.amount)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-3">
+                    {draft.budgetOptions.map((option, idx) => (
+                      <div
+                        key={option.id}
+                        className={cn(
+                          "space-y-3 rounded-lg border p-3",
+                          option.isSelected
+                            ? "border-accent bg-accent/5"
+                            : "border-border",
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium uppercase tracking-wide text-ink-tertiary">
+                            Opção {idx + 1}
+                            {option.isSelected ? " · definida" : ""}
+                          </p>
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                budgetOptions: draft.budgetOptions.filter(
+                                  (o) => o.id !== option.id,
+                                ),
+                              })
+                            }
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Nome da opção</Label>
+                          <Input
+                            value={option.title}
+                            placeholder="Ex: Buffet Casa Aurora"
+                            onChange={(e) =>
+                              updateOption(option.id, {
+                                title: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label>Valor (R$)</Label>
+                            <Input
+                              type="number"
+                              value={option.amount / 100}
+                              onChange={(e) =>
+                                updateOption(option.id, {
+                                  amount: Math.round(
+                                    Number(e.target.value || 0) * 100,
+                                  ),
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Empresa / fornecedor</Label>
+                            <Input
+                              value={option.vendorName}
+                              placeholder="Nome da empresa"
+                              onChange={(e) =>
+                                updateOption(option.id, {
+                                  vendorName: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Vincular fornecedor cadastrado</Label>
+                          <Select
+                            value={option.vendorId ?? "__none"}
+                            onValueChange={(v) => {
+                              const vendor =
+                                v === "__none"
+                                  ? null
+                                  : workspace.vendors.find((x) => x.id === v);
+                              updateOption(option.id, {
+                                vendorId: v === "__none" ? null : v,
+                                vendorName: vendor?.name ?? option.vendorName,
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Opcional" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none">Nenhum</SelectItem>
+                              {workspace.vendors.map((v) => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  {v.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {option.isSelected ? (
+                          <div className="space-y-3 rounded-md bg-canvas-muted/60 p-3">
+                            <p className="text-xs font-medium text-ink">
+                              Pagamento (opção definida)
+                            </p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <Label>Forma</Label>
+                                <Select
+                                  value={option.paymentPlan}
+                                  onValueChange={(v) => {
+                                    const plan = v as PaymentPlan;
+                                    if (plan === "installments") {
+                                      const count =
+                                        option.installmentCount ?? 2;
+                                      updateOption(option.id, {
+                                        paymentPlan: plan,
+                                        installments: buildInstallments(
+                                          count,
+                                          option.amount,
+                                          option.nextPaymentDate ?? today,
+                                        ),
+                                      });
+                                    } else {
+                                      updateOption(option.id, {
+                                        paymentPlan: plan,
+                                        installments: [],
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="lump_sum">
+                                      À vista
+                                    </SelectItem>
+                                    <SelectItem value="installments">
+                                      Parcelado
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Status pagamento</Label>
+                                <Select
+                                  value={option.paymentStatus}
+                                  onValueChange={(v) =>
+                                    updateOption(option.id, {
+                                      paymentStatus: v as PaymentStatus,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="unpaid">
+                                      Não pago
+                                    </SelectItem>
+                                    <SelectItem value="partial">
+                                      Parcialmente pago
+                                    </SelectItem>
+                                    <SelectItem value="paid">Pago</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <Label>Já pago (R$)</Label>
+                                <Input
+                                  type="number"
+                                  value={option.paidAmount / 100}
+                                  onChange={(e) =>
+                                    updateOption(option.id, {
+                                      paidAmount: Math.round(
+                                        Number(e.target.value || 0) * 100,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Próximo pagamento</Label>
+                                <Input
+                                  type="date"
+                                  value={option.nextPaymentDate ?? ""}
+                                  onChange={(e) =>
+                                    updateOption(option.id, {
+                                      nextPaymentDate:
+                                        e.target.value || null,
+                                    })
+                                  }
+                                />
+                              </div>
+                            </div>
+
+                            {option.paymentPlan === "installments" ? (
+                              <div className="space-y-2">
+                                <div className="flex items-end gap-2">
+                                  <div className="flex-1 space-y-2">
+                                    <Label>Nº de parcelas</Label>
+                                    <Input
+                                      type="number"
+                                      min={2}
+                                      max={24}
+                                      value={option.installmentCount ?? 2}
+                                      onChange={(e) =>
+                                        updateOption(option.id, {
+                                          installmentCount: Number(
+                                            e.target.value || 2,
+                                          ),
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() =>
+                                      updateOption(option.id, {
+                                        installments: buildInstallments(
+                                          option.installmentCount ?? 2,
+                                          option.amount,
+                                          option.nextPaymentDate ?? today,
+                                        ),
+                                      })
+                                    }
+                                  >
+                                    Gerar parcelas
+                                  </Button>
+                                </div>
+                                <ul className="space-y-2">
+                                  {option.installments.map((inst) => (
+                                    <li
+                                      key={inst.id}
+                                      className="grid grid-cols-[auto_1fr_1fr_auto] items-center gap-2 text-xs"
+                                    >
+                                      <span className="font-medium">
+                                        #{inst.sequence}
+                                      </span>
+                                      <Input
+                                        type="number"
+                                        className="h-8"
+                                        value={inst.amount / 100}
+                                        onChange={(e) =>
+                                          updateOption(option.id, {
+                                            installments:
+                                              option.installments.map((i) =>
+                                                i.id === inst.id
+                                                  ? {
+                                                      ...i,
+                                                      amount: Math.round(
+                                                        Number(
+                                                          e.target.value || 0,
+                                                        ) * 100,
+                                                      ),
+                                                    }
+                                                  : i,
+                                              ),
+                                          })
+                                        }
+                                      />
+                                      <Input
+                                        type="date"
+                                        className="h-8"
+                                        value={inst.dueDate ?? ""}
+                                        onChange={(e) =>
+                                          updateOption(option.id, {
+                                            installments:
+                                              option.installments.map((i) =>
+                                                i.id === inst.id
+                                                  ? {
+                                                      ...i,
+                                                      dueDate:
+                                                        e.target.value || null,
+                                                    }
+                                                  : i,
+                                              ),
+                                          })
+                                        }
+                                      />
+                                      <label className="flex items-center gap-1">
+                                        <input
+                                          type="checkbox"
+                                          checked={!!inst.paidAt}
+                                          onChange={(e) => {
+                                            const nextInst =
+                                              option.installments.map((i) =>
+                                                i.id === inst.id
+                                                  ? {
+                                                      ...i,
+                                                      paidAt: e.target.checked
+                                                        ? new Date().toISOString()
+                                                        : null,
+                                                    }
+                                                  : i,
+                                              );
+                                            const paidAmount = nextInst
+                                              .filter((i) => i.paidAt)
+                                              .reduce(
+                                                (acc, i) => acc + i.amount,
+                                                0,
+                                              );
+                                            updateOption(option.id, {
+                                              installments: nextInst,
+                                              paidAmount,
+                                              paymentStatus:
+                                                paidAmount <= 0
+                                                  ? "unpaid"
+                                                  : paidAmount >= option.amount
+                                                    ? "paid"
+                                                    : "partial",
+                                            });
+                                          }}
+                                        />
+                                        Pago
+                                      </label>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => selectOption(option.id)}
+                          >
+                            Definir este orçamento
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </SheetBody>
               <SheetFooter>
                 <Button
@@ -328,6 +871,12 @@ export default function TasksPage() {
                     if (!draft.title.trim()) {
                       toast.error("Informe o título");
                       return;
+                    }
+                    for (const o of draft.budgetOptions) {
+                      if (!o.title.trim()) {
+                        toast.error("Nomeie todas as opções de orçamento");
+                        return;
+                      }
                     }
                     upsert(draft);
                     toast.success("Tarefa salva");

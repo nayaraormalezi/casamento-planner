@@ -4,18 +4,43 @@ import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiStat } from "@/components/shared/kpi-stat";
 import { AlertRow } from "@/components/shared/alert-row";
+import { TaskTracker } from "@/components/shared/task-tracker";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { useWeddingStore } from "@/lib/demo/store";
 import { composeDashboard } from "@/modules/budget/calculations";
 import { buildAlerts, nextStep } from "@/modules/alerts/rules";
+import { PHASE_LABEL } from "@/modules/tasks/module-links";
 import { formatMoneyBRL } from "@/utils/cn";
 
 export default function DashboardPage() {
   const workspace = useWeddingStore((s) => s.workspace)!;
+  const upsertTask = useWeddingStore((s) => s.upsertTask);
   const dash = composeDashboard(workspace);
   const alerts = buildAlerts(workspace);
   const step = nextStep(alerts);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const openTasks = workspace.tasks
+    .filter((t) => t.status !== "done")
+    .sort((a, b) => {
+      const aOver = a.dueDate && a.dueDate < today ? 0 : 1;
+      const bOver = b.dueDate && b.dueDate < today ? 0 : 1;
+      if (aOver !== bOver) return aOver - bOver;
+      if (b.priority !== a.priority) return b.priority - a.priority;
+      return (a.dueDate ?? "").localeCompare(b.dueDate ?? "");
+    });
+
+  const phaseTasks = openTasks.filter((t) => t.phase === dash.phase);
+  const trackerTasks =
+    phaseTasks.length > 0 ? phaseTasks : openTasks.slice(0, 8);
+
+  function toggleDone(task: (typeof workspace.tasks)[number]) {
+    upsertTask({
+      ...task,
+      status: task.status === "done" ? "todo" : "done",
+    });
+  }
 
   return (
     <div>
@@ -24,7 +49,7 @@ export default function DashboardPage() {
         description={
           step
             ? `Próximo: ${step.title}`
-            : "Tudo sob controle — avance nas tarefas da fase atual."
+            : `Fase ${PHASE_LABEL[dash.phase]} — acompanhe cada frente abaixo.`
         }
         actions={
           step ? (
@@ -80,6 +105,21 @@ export default function DashboardPage() {
             {formatMoneyBRL(dash.remainingCash)}
           </p>
         </div>
+      </div>
+
+      <div className="mt-10">
+        <TaskTracker
+          workspace={workspace}
+          tasks={trackerTasks}
+          onToggleDone={toggleDone}
+          title={
+            phaseTasks.length > 0
+              ? `Tarefas da fase · ${PHASE_LABEL[dash.phase]}`
+              : "Próximas tarefas"
+          }
+          emptyLabel="Todas as tarefas desta fase estão concluídas."
+          showPhase={phaseTasks.length === 0}
+        />
       </div>
 
       <div className="mt-10 grid gap-8 lg:grid-cols-5">
@@ -141,7 +181,7 @@ export default function DashboardPage() {
             <h2 className="mb-3 font-display text-lg font-semibold">Resumo</h2>
             <ul className="space-y-2 text-sm text-ink-secondary">
               <li>Fornecedores contratados: {dash.vendorsContracted}</li>
-              <li>Fase atual: {dash.phase}</li>
+              <li>Fase atual: {PHASE_LABEL[dash.phase]}</li>
               <li>
                 Orçamento livre:{" "}
                 <span className="tabular-nums font-medium text-ink">

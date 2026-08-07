@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -33,11 +34,25 @@ function newId() {
 }
 
 export default function VendorsPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-ink-tertiary">Carregando…</div>}>
+      <VendorsPageInner />
+    </Suspense>
+  );
+}
+
+function VendorsPageInner() {
   const workspace = useWeddingStore((s) => s.workspace)!;
   const upsert = useWeddingStore((s) => s.upsertVendor);
   const remove = useWeddingStore((s) => s.removeVendor);
+  const params = useSearchParams();
+  const categoryFilter = params.get("category");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Vendor | null>(null);
+
+  const vendors = categoryFilter
+    ? workspace.vendors.filter((v) => v.categorySlug === categoryFilter)
+    : workspace.vendors;
 
   const contracted = workspace.vendors.filter((v) => v.status === "contracted")
     .length;
@@ -45,7 +60,8 @@ export default function VendorsPage() {
   function openNew() {
     setDraft({
       id: newId(),
-      categorySlug: workspace.categories[0]?.slug ?? "other",
+      categorySlug:
+        categoryFilter ?? workspace.categories[0]?.slug ?? "other",
       name: "",
       contactName: "",
       phone: "",
@@ -65,21 +81,28 @@ export default function VendorsPage() {
     <div>
       <PageHeader
         title="Fornecedores"
-        description={`${contracted} contratados · ${workspace.vendors.length} no total`}
+        description={`${contracted} contratados · ${workspace.vendors.length} no total${
+          categoryFilter
+            ? ` · filtro: ${
+                workspace.categories.find((c) => c.slug === categoryFilter)
+                  ?.name ?? categoryFilter
+              }`
+            : ""
+        }`}
         actions={<Button onClick={openNew}>Novo fornecedor</Button>}
       />
 
-      {workspace.vendors.length === 0 ? (
+      {vendors.length === 0 ? (
         <EmptyState
           icon={Truck}
           title="Ainda sem contratos"
-          description="Contrate o local primeiro — costuma desbloquear o restante do plano."
+          description="Cadastre a empresa, o responsável e o telefone de cada fornecedor."
           actionLabel="Adicionar fornecedor"
           onAction={openNew}
         />
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border bg-canvas-elevated">
-          {workspace.vendors.map((v) => (
+          {vendors.map((v) => (
             <li key={v.id}>
               <button
                 type="button"
@@ -95,6 +118,13 @@ export default function VendorsPage() {
                     {workspace.categories.find((c) => c.slug === v.categorySlug)
                       ?.name ?? v.categorySlug}
                   </p>
+                  {(v.contactName || v.phone) && (
+                    <p className="mt-1 text-xs text-ink-tertiary">
+                      {[v.contactName && `Resp.: ${v.contactName}`, v.phone]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   {v.quotedAmount != null ? (
@@ -125,12 +155,13 @@ export default function VendorsPage() {
             <>
               <SheetBody className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Nome</Label>
+                  <Label>Empresa fornecedora</Label>
                   <Input
                     value={draft.name}
                     onChange={(e) =>
                       setDraft({ ...draft, name: e.target.value })
                     }
+                    placeholder="Ex: Casa Figueira Eventos"
                   />
                 </div>
                 <div className="space-y-2">
@@ -182,6 +213,36 @@ export default function VendorsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Nome do responsável</Label>
+                  <Input
+                    value={draft.contactName}
+                    onChange={(e) =>
+                      setDraft({ ...draft, contactName: e.target.value })
+                    }
+                    placeholder="Quem fala com vocês"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telefone de contato</Label>
+                  <Input
+                    value={draft.phone}
+                    onChange={(e) =>
+                      setDraft({ ...draft, phone: e.target.value })
+                    }
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>E-mail</Label>
+                  <Input
+                    type="email"
+                    value={draft.email}
+                    onChange={(e) =>
+                      setDraft({ ...draft, email: e.target.value })
+                    }
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Cotado (R$)</Label>
@@ -197,32 +258,14 @@ export default function VendorsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Contato</Label>
+                    <Label>Instagram</Label>
                     <Input
-                      value={draft.contactName}
+                      value={draft.instagram}
                       onChange={(e) =>
-                        setDraft({ ...draft, contactName: e.target.value })
+                        setDraft({ ...draft, instagram: e.target.value })
                       }
                     />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone</Label>
-                  <Input
-                    value={draft.phone}
-                    onChange={(e) =>
-                      setDraft({ ...draft, phone: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Instagram</Label>
-                  <Input
-                    value={draft.instagram}
-                    onChange={(e) =>
-                      setDraft({ ...draft, instagram: e.target.value })
-                    }
-                  />
                 </div>
               </SheetBody>
               <SheetFooter>
@@ -230,7 +273,7 @@ export default function VendorsPage() {
                   className="flex-1"
                   onClick={() => {
                     if (!draft.name.trim()) {
-                      toast.error("Informe o nome");
+                      toast.error("Informe a empresa");
                       return;
                     }
                     upsert(draft);

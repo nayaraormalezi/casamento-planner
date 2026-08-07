@@ -65,6 +65,18 @@ export async function loadWorkspaceForUser(): Promise<{
     prisma.task.findMany({
       where: { weddingId: wedding.id, deletedAt: null },
       orderBy: [{ dueDate: "asc" }, { sortOrder: "asc" }],
+      include: {
+        budgetOptions: {
+          include: { installments: { orderBy: { sequence: "asc" } } },
+          orderBy: { sortOrder: "asc" },
+        },
+      },
+    }).catch(async () => {
+      // Fallback if Prisma client is stale mid-deploy
+      return prisma.task.findMany({
+        where: { weddingId: wedding.id, deletedAt: null },
+        orderBy: [{ dueDate: "asc" }, { sortOrder: "asc" }],
+      });
     }),
     prisma.guest.findMany({
       where: { weddingId: wedding.id, deletedAt: null },

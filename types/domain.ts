@@ -7,7 +7,44 @@ export type BudgetItemStatus =
   | "partially_paid"
   | "paid"
   | "cancelled";
-export type TaskStatus = "todo" | "doing" | "blocked" | "done" | "cancelled";
+export type TaskStatus = "todo" | "doing" | "done";
+export type PaymentPlan = "lump_sum" | "installments";
+export type PaymentStatus = "unpaid" | "partial" | "paid";
+export type PaymentMethod =
+  | "pix"
+  | "credit_card"
+  | "debit_card"
+  | "boleto"
+  | "transfer"
+  | "cash"
+  | "other";
+
+export type TaskBudgetInstallment = {
+  id: string;
+  sequence: number;
+  amount: number;
+  dueDate: string | null;
+  paidAt: string | null;
+  paymentMethod: PaymentMethod | null;
+  notes: string;
+};
+
+export type TaskBudgetOption = {
+  id: string;
+  taskId: string;
+  title: string;
+  vendorId: string | null;
+  vendorName: string;
+  amount: number;
+  notes: string;
+  isSelected: boolean;
+  paymentPlan: PaymentPlan;
+  paymentStatus: PaymentStatus;
+  paidAmount: number;
+  nextPaymentDate: string | null;
+  installmentCount: number | null;
+  installments: TaskBudgetInstallment[];
+};
 export type TaskPhase =
   | "m18"
   | "m12"
@@ -100,6 +137,7 @@ export type Task = {
   vendorId: string | null;
   budgetItemId: string | null;
   templateKey: string | null;
+  budgetOptions: TaskBudgetOption[];
 };
 
 export type Guest = {

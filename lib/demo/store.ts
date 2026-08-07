@@ -77,7 +77,10 @@ type WeddingStore = {
   ) => Promise<void>;
 };
 
-async function reload(set: (p: Partial<WeddingStore>) => void) {
+async function reload(
+  set: (p: Partial<WeddingStore>) => void,
+  get?: () => WeddingStore,
+) {
   const sessionRes = await getSessionAction();
   if (!sessionRes.ok || !sessionRes.user) {
     set({ session: null, workspace: null, hydrated: true, loading: false });
@@ -91,8 +94,22 @@ async function reload(set: (p: Partial<WeddingStore>) => void) {
     },
   });
   const ws = await getWorkspaceAction();
+  if (ws.ok) {
+    set({
+      workspace: ws.workspace,
+      hydrated: true,
+      loading: false,
+    });
+    return;
+  }
+  // Don't wipe a valid in-memory workspace on transient load errors
+  const current = get?.().workspace;
+  if (current?.wedding.onboardingDone) {
+    set({ hydrated: true, loading: false });
+    return;
+  }
   set({
-    workspace: ws.workspace,
+    workspace: null,
     hydrated: true,
     loading: false,
   });
@@ -106,17 +123,28 @@ export const useWeddingStore = create<WeddingStore>((set, get) => ({
 
   hydrate: async () => {
     set({ loading: true });
-    await reload(set);
+    await reload(set, get);
   },
 
   refresh: async () => {
-    await reload(set);
+    await reload(set, get);
   },
 
   completeOnboarding: async (input) => {
     const res = await completeOnboardingAction(input);
-    if (res.ok) await reload(set);
-    return res;
+    if (res.ok) {
+      if (res.workspace) {
+        set({
+          workspace: res.workspace,
+          hydrated: true,
+          loading: false,
+        });
+      } else {
+        await reload(set, get);
+      }
+      return { ok: true as const };
+    }
+    return { ok: false as const, error: res.error };
   },
 
   logout: async () => {

@@ -28,18 +28,16 @@ export function sumCommitted(items: BudgetItem[]): number {
 }
 
 export function taskStats(tasks: Task[]) {
-  const active = tasks.filter((t) => t.status !== "cancelled");
-  const done = active.filter((t) => t.status === "done");
+  const open = tasks.filter((t) => t.status === "todo" || t.status === "doing");
+  const done = tasks.filter((t) => t.status === "done");
   const today = new Date().toISOString().slice(0, 10);
-  const overdue = active.filter(
-    (t) => t.status !== "done" && t.dueDate != null && t.dueDate < today,
-  );
+  const overdue = open.filter((t) => t.dueDate != null && t.dueDate < today);
+  const total = open.length + done.length;
   return {
-    total: active.length,
+    total,
     done: done.length,
     overdue: overdue.length,
-    completionPct:
-      active.length === 0 ? 0 : Math.round((done.length / active.length) * 100),
+    completionPct: total === 0 ? 0 : Math.round((done.length / total) * 100),
   };
 }
 

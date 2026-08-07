@@ -32,9 +32,6 @@ export default function HomePage() {
           <Button size="lg" asChild>
             <Link href="/login">Começar planejamento</Link>
           </Button>
-          <Button size="lg" variant="secondary" asChild>
-            <Link href="/dev/components">Design system</Link>
-          </Button>
         </div>
       </main>
 

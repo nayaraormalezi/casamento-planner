@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
-import { createWeddingOnboarding } from "@/modules/wedding/onboarding";
+import { createWeddingOnboarding, seedOnboardingExtras } from "@/modules/wedding/onboarding";
+import { after } from "next/server";
 import { loadWorkspaceForUser } from "@/modules/wedding/load-workspace";
 import { requireMembership } from "@/lib/auth/membership";
 import type {
@@ -59,19 +60,38 @@ export async function completeOnboardingAction(input: {
 }) {
   const user = await requireUser();
 
-  const existing = await prisma.membership.findFirst({
-    where: { userId: user.id },
-  });
-  if (existing) {
-    return { ok: false as const, error: "ALREADY_ONBOARDED" };
-  }
-
   if (!input.weddingDate || input.totalBudgetReais <= 0 || !input.city) {
     return { ok: false as const, error: "INVALID_INPUT" };
   }
 
+  // Retry-safe: a failed PgBouncer transaction can leave a half-created workspace.
+  const existing = await prisma.membership.findFirst({
+    where: { userId: user.id },
+    include: {
+      workspace: {
+        include: {
+          weddings: { where: { deletedAt: null }, take: 1 },
+        },
+      },
+    },
+  });
+
+  if (existing) {
+    const wedding = existing.workspace.weddings[0];
+    if (wedding?.onboardingDone) {
+      const { workspace } = await loadWorkspaceForUser();
+      return {
+        ok: true as const,
+        workspace,
+        alreadyOnboarded: true as const,
+      };
+    }
+    // Incomplete — wipe and recreate
+    await prisma.workspace.delete({ where: { id: existing.workspaceId } });
+  }
+
   try {
-    await createWeddingOnboarding(user.id, user.email, {
+    const created = await createWeddingOnboarding(user.id, user.email, {
       partnerOneName: input.partnerOneName,
       partnerTwoName: input.partnerTwoName,
       weddingDate: input.weddingDate,
@@ -80,13 +100,20 @@ export async function completeOnboardingAction(input: {
       venue: input.venue,
       styleTags: input.styleTags,
     });
+
+    // Finish checklist in background so the user reaches the dashboard sooner.
+    after(() =>
+      seedOnboardingExtras(created.plan).catch((err) => {
+        console.error("seedOnboardingExtras failed", err);
+      }),
+    );
+
+    revalidatePath("/app", "layout");
+    return { ok: true as const, workspace: created.workspace };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "ONBOARDING_FAILED";
     return { ok: false as const, error: msg };
   }
-
-  revalidatePath("/app", "layout");
-  return { ok: true as const };
 }
 
 export async function upsertBudgetItemAction(item: BudgetItem) {
@@ -165,6 +192,7 @@ export async function applyBudgetCutsAction(
 
 export async function upsertTaskAction(task: Task) {
   const ctx = await requireMembership(["owner", "partner", "collaborator"]);
+
   await prisma.task.upsert({
     where: { id: task.id },
     create: {
@@ -200,10 +228,129 @@ export async function upsertTaskAction(task: Task) {
       budgetItemId: task.budgetItemId,
     },
   });
+
+  const options = task.budgetOptions ?? [];
+  const keepIds = options.map((o) => o.id);
+
+  await prisma.taskBudgetOption.deleteMany({
+    where: {
+      taskId: task.id,
+      weddingId: ctx.weddingId,
+      ...(keepIds.length ? { id: { notIn: keepIds } } : {}),
+    },
+  });
+
+  for (const option of options) {
+    const paymentStatus = derivePaymentStatus(option);
+    await prisma.taskBudgetOption.upsert({
+      where: { id: option.id },
+      create: {
+        id: option.id,
+        workspaceId: ctx.workspaceId,
+        weddingId: ctx.weddingId,
+        taskId: task.id,
+        title: option.title,
+        vendorId: option.vendorId,
+        vendorName: option.vendorName || null,
+        amount: option.amount,
+        notes: option.notes || null,
+        isSelected: option.isSelected,
+        paymentPlan: option.paymentPlan,
+        paymentStatus,
+        paidAmount: option.paidAmount,
+        nextPaymentDate: parseDate(option.nextPaymentDate),
+        installmentCount: option.installmentCount,
+      },
+      update: {
+        title: option.title,
+        vendorId: option.vendorId,
+        vendorName: option.vendorName || null,
+        amount: option.amount,
+        notes: option.notes || null,
+        isSelected: option.isSelected,
+        paymentPlan: option.paymentPlan,
+        paymentStatus,
+        paidAmount: option.paidAmount,
+        nextPaymentDate: parseDate(option.nextPaymentDate),
+        installmentCount: option.installmentCount,
+      },
+    });
+
+    const installments = option.installments ?? [];
+    const keepInst = installments.map((i) => i.id);
+    await prisma.taskBudgetInstallment.deleteMany({
+      where: {
+        optionId: option.id,
+        ...(keepInst.length ? { id: { notIn: keepInst } } : {}),
+      },
+    });
+
+    for (const inst of installments) {
+      await prisma.taskBudgetInstallment.upsert({
+        where: { id: inst.id },
+        create: {
+          id: inst.id,
+          optionId: option.id,
+          sequence: inst.sequence,
+          amount: inst.amount,
+          dueDate: parseDate(inst.dueDate),
+          paidAt: inst.paidAt ? new Date(inst.paidAt) : null,
+          paymentMethod: inst.paymentMethod,
+          notes: inst.notes || null,
+        },
+        update: {
+          sequence: inst.sequence,
+          amount: inst.amount,
+          dueDate: parseDate(inst.dueDate),
+          paidAt: inst.paidAt ? new Date(inst.paidAt) : null,
+          paymentMethod: inst.paymentMethod,
+          notes: inst.notes || null,
+        },
+      });
+    }
+  }
+
+  // Ensure only one selected option
+  const selected = options.find((o) => o.isSelected);
+  if (selected) {
+    await prisma.taskBudgetOption.updateMany({
+      where: { taskId: task.id, id: { not: selected.id } },
+      data: { isSelected: false },
+    });
+    if (selected.vendorId) {
+      await prisma.task.update({
+        where: { id: task.id },
+        data: { vendorId: selected.vendorId },
+      });
+    }
+  }
+
   revalidatePath("/app/tasks");
   revalidatePath("/app/schedule");
   revalidatePath("/app/dashboard");
   return { ok: true as const };
+}
+
+function derivePaymentStatus(option: {
+  amount: number;
+  paidAmount: number;
+  paymentStatus: Task["budgetOptions"][number]["paymentStatus"];
+  installments?: { paidAt: string | null }[];
+}): Task["budgetOptions"][number]["paymentStatus"] {
+  if (option.paymentStatus === "paid" || option.paidAmount >= option.amount) {
+    if (option.amount > 0 && option.paidAmount >= option.amount) return "paid";
+  }
+  const paidInst =
+    option.installments?.filter((i) => i.paidAt != null).length ?? 0;
+  const totalInst = option.installments?.length ?? 0;
+  if (totalInst > 0) {
+    if (paidInst >= totalInst) return "paid";
+    if (paidInst > 0) return "partial";
+    return "unpaid";
+  }
+  if (option.paidAmount <= 0) return "unpaid";
+  if (option.paidAmount >= option.amount && option.amount > 0) return "paid";
+  return "partial";
 }
 
 export async function removeTaskAction(id: string) {

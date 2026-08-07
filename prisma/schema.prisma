@@ -67,6 +67,17 @@ enum PaymentMethod {
   other
 }
 
+enum PaymentPlan {
+  lump_sum
+  installments
+}
+
+enum PaymentStatus {
+  unpaid
+  partial
+  paid
+}
+
 enum VendorStatus {
   researching
   contacted
@@ -309,6 +320,7 @@ model Wedding {
   honeymoonItems HoneymoonItem[]
   aiSuggestions  AiSuggestion[]
   categories     BudgetCategory[]
+  taskBudgetOptions TaskBudgetOption[]
 
   @@index([workspaceId])
   @@index([weddingDate])
@@ -426,6 +438,7 @@ model Vendor {
   budgetItems BudgetItem[]
   tasks       Task[]
   decisions   Decision[]
+  taskBudgetOptions TaskBudgetOption[]
 
   @@index([workspaceId])
   @@index([weddingId, status])
@@ -464,6 +477,7 @@ model Task {
   assignee     Profile?         @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   budgetItem   BudgetItem?      @relation(fields: [budgetItemId], references: [id], onDelete: SetNull)
   vendor       Vendor?          @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  budgetOptions TaskBudgetOption[]
   comments     TaskComment[]
   dependencies TaskDependency[] @relation("DependentTask")
   dependents   TaskDependency[] @relation("PrerequisiteTask")
@@ -476,6 +490,56 @@ model Task {
   @@index([isMilestone])
   @@index([deletedAt])
   @@map("tasks")
+}
+
+model TaskBudgetOption {
+  id               String        @id @default(uuid()) @db.Uuid
+  workspaceId      String        @map("workspace_id") @db.Uuid
+  weddingId        String        @map("wedding_id") @db.Uuid
+  taskId           String        @map("task_id") @db.Uuid
+  title            String
+  vendorId         String?       @map("vendor_id") @db.Uuid
+  vendorName       String?       @map("vendor_name")
+  amount           Int           @default(0) // centavos
+  notes            String?
+  isSelected       Boolean       @default(false) @map("is_selected")
+  paymentPlan      PaymentPlan   @default(lump_sum) @map("payment_plan")
+  paymentStatus    PaymentStatus @default(unpaid) @map("payment_status")
+  paidAmount       Int           @default(0) @map("paid_amount")
+  nextPaymentDate  DateTime?     @map("next_payment_date") @db.Date
+  installmentCount Int?          @map("installment_count")
+  sortOrder        Int           @default(0) @map("sort_order")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  task         Task                    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  wedding      Wedding                 @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  vendor       Vendor?                 @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  installments TaskBudgetInstallment[]
+
+  @@index([workspaceId])
+  @@index([weddingId])
+  @@index([taskId, isSelected])
+  @@map("task_budget_options")
+}
+
+model TaskBudgetInstallment {
+  id            String         @id @default(uuid()) @db.Uuid
+  optionId      String         @map("option_id") @db.Uuid
+  sequence      Int
+  amount        Int // centavos
+  dueDate       DateTime?      @map("due_date") @db.Date
+  paidAt        DateTime?      @map("paid_at")
+  paymentMethod PaymentMethod? @map("payment_method")
+  notes         String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  option TaskBudgetOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([optionId, sequence])
+  @@index([dueDate])
+  @@map("task_budget_installments")
 }
 
 model TaskDependency {

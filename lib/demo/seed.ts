@@ -86,6 +86,7 @@ export function buildOnboardingWorkspace(input: {
     vendorId: null,
     budgetItemId: null,
     templateKey: t.templateKey,
+    budgetOptions: [],
   }));
 
   // Seed a few budget lines so dashboard isn't empty

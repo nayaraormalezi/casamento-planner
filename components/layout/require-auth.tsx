@@ -18,23 +18,33 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }, [hydrated, loading, hydrate]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || loading) return;
     if (!session) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
+    // Only bounce to onboarding when we know there is no completed wedding.
     if (!workspace?.wedding.onboardingDone && !pathname.startsWith("/onboarding")) {
       router.replace("/onboarding");
     }
-  }, [hydrated, session, workspace, pathname, router]);
+  }, [hydrated, loading, session, workspace, pathname, router]);
 
-  if (!hydrated || !session) {
+  if (!hydrated || loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center text-sm text-ink-tertiary">
         Carregando…
       </div>
     );
   }
+
+  if (!session) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-sm text-ink-tertiary">
+        Carregando…
+      </div>
+    );
+  }
+
   if (!workspace?.wedding.onboardingDone && !pathname.startsWith("/onboarding")) {
     return (
       <div className="flex min-h-dvh items-center justify-center text-sm text-ink-tertiary">
