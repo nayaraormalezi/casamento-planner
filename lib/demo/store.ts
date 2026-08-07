@@ -1,7 +1,6 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type {
   BudgetItem,
   Decision,
@@ -13,24 +12,35 @@ import type {
   WeddingWorkspace,
 } from "@/types/domain";
 import {
-  buildDemoWorkspace,
-  buildOnboardingWorkspace,
-  createEmptyWorkspace,
-} from "@/lib/demo/seed";
+  applyBudgetCutsAction,
+  completeOnboardingAction,
+  getSessionAction,
+  getWorkspaceAction,
+  removeBudgetItemAction,
+  removeDecisionAction,
+  removeGiftAction,
+  removeGuestAction,
+  removeTaskAction,
+  removeVendorAction,
+  signOutAction,
+  updateWeddingAction,
+  upsertBudgetItemAction,
+  upsertDecisionAction,
+  upsertGiftAction,
+  upsertGuestAction,
+  upsertHoneymoonItemAction,
+  upsertTaskAction,
+  upsertVendorAction,
+} from "@/app/actions/wedding";
 
-type Session = {
-  email: string;
-  name: string;
-} | null;
+type Session = { id: string; email: string; fullName: string | null } | null;
 
 type WeddingStore = {
   hydrated: boolean;
-  setHydrated: (v: boolean) => void;
+  loading: boolean;
   session: Session;
-  login: (email: string, name?: string) => void;
-  logout: () => void;
   workspace: WeddingWorkspace | null;
-  loadDemo: () => void;
+  hydrate: () => Promise<void>;
   completeOnboarding: (input: {
     partnerOneName: string;
     partnerTwoName: string;
@@ -39,240 +49,145 @@ type WeddingStore = {
     city: string;
     venue?: string;
     styleTags?: string[];
-  }) => void;
-  resetWorkspace: () => void;
-  upsertBudgetItem: (item: BudgetItem) => void;
-  removeBudgetItem: (id: string) => void;
-  upsertVendor: (vendor: Vendor) => void;
-  removeVendor: (id: string) => void;
-  upsertTask: (task: Task) => void;
-  removeTask: (id: string) => void;
-  upsertGuest: (guest: Guest) => void;
-  removeGuest: (id: string) => void;
-  upsertGift: (gift: Gift) => void;
-  removeGift: (id: string) => void;
-  upsertDecision: (decision: Decision) => void;
-  removeDecision: (id: string) => void;
-  upsertHoneymoonItem: (item: HoneymoonItem) => void;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  refresh: () => Promise<void>;
+  logout: () => Promise<void>;
+  upsertBudgetItem: (item: BudgetItem) => Promise<void>;
+  removeBudgetItem: (id: string) => Promise<void>;
   applyBudgetCuts: (
-    updates: { id: string; plannedAmount: number; status?: BudgetItem["status"] }[],
-  ) => void;
-  updateWedding: (patch: Partial<WeddingWorkspace["wedding"]>) => void;
+    updates: {
+      id: string;
+      plannedAmount: number;
+      status?: BudgetItem["status"];
+    }[],
+  ) => Promise<void>;
+  upsertVendor: (vendor: Vendor) => Promise<void>;
+  removeVendor: (id: string) => Promise<void>;
+  upsertTask: (task: Task) => Promise<void>;
+  removeTask: (id: string) => Promise<void>;
+  upsertGuest: (guest: Guest) => Promise<void>;
+  removeGuest: (id: string) => Promise<void>;
+  upsertGift: (gift: Gift) => Promise<void>;
+  removeGift: (id: string) => Promise<void>;
+  upsertDecision: (decision: Decision) => Promise<void>;
+  removeDecision: (id: string) => Promise<void>;
+  upsertHoneymoonItem: (item: HoneymoonItem) => Promise<void>;
+  updateWedding: (
+    patch: Partial<WeddingWorkspace["wedding"]>,
+  ) => Promise<void>;
 };
 
-function requireWs(ws: WeddingWorkspace | null): WeddingWorkspace {
-  if (!ws) throw new Error("Workspace não inicializado");
-  return ws;
+async function reload(set: (p: Partial<WeddingStore>) => void) {
+  const sessionRes = await getSessionAction();
+  if (!sessionRes.ok || !sessionRes.user) {
+    set({ session: null, workspace: null, hydrated: true, loading: false });
+    return;
+  }
+  set({
+    session: {
+      id: sessionRes.user.id,
+      email: sessionRes.user.email,
+      fullName: sessionRes.user.fullName,
+    },
+  });
+  const ws = await getWorkspaceAction();
+  set({
+    workspace: ws.workspace,
+    hydrated: true,
+    loading: false,
+  });
 }
 
-export const useWeddingStore = create<WeddingStore>()(
-  persist(
-    (set, get) => ({
-      hydrated: false,
-      setHydrated: (v) => set({ hydrated: v }),
-      session: null,
-      login: (email, name) =>
-        set({
-          session: {
-            email,
-            name: name || email.split("@")[0] || "Usuário",
-          },
-        }),
-      logout: () => set({ session: null }),
-      workspace: null,
-      loadDemo: () => set({ workspace: buildDemoWorkspace() }),
-      completeOnboarding: (input) =>
-        set({
-          workspace: buildOnboardingWorkspace({
-            partnerOneName: input.partnerOneName,
-            partnerTwoName: input.partnerTwoName,
-            weddingDate: input.weddingDate,
-            totalBudget: Math.round(input.totalBudgetReais * 100),
-            city: input.city,
-            venue: input.venue,
-            styleTags: input.styleTags,
-          }),
-        }),
-      resetWorkspace: () => set({ workspace: createEmptyWorkspace() }),
-      upsertBudgetItem: (item) => {
-        const ws = requireWs(get().workspace);
-        const exists = ws.budgetItems.some((i) => i.id === item.id);
-        set({
-          workspace: {
-            ...ws,
-            budgetItems: exists
-              ? ws.budgetItems.map((i) => (i.id === item.id ? item : i))
-              : [...ws.budgetItems, item],
-          },
-        });
-      },
-      removeBudgetItem: (itemId) => {
-        const ws = requireWs(get().workspace);
-        set({
-          workspace: {
-            ...ws,
-            budgetItems: ws.budgetItems.filter((i) => i.id !== itemId),
-          },
-        });
-      },
-      upsertVendor: (vendor) => {
-        const ws = requireWs(get().workspace);
-        const exists = ws.vendors.some((v) => v.id === vendor.id);
-        set({
-          workspace: {
-            ...ws,
-            vendors: exists
-              ? ws.vendors.map((v) => (v.id === vendor.id ? vendor : v))
-              : [...ws.vendors, vendor],
-          },
-        });
-      },
-      removeVendor: (vendorId) => {
-        const ws = requireWs(get().workspace);
-        set({
-          workspace: {
-            ...ws,
-            vendors: ws.vendors.filter((v) => v.id !== vendorId),
-          },
-        });
-      },
-      upsertTask: (task) => {
-        const ws = requireWs(get().workspace);
-        const exists = ws.tasks.some((t) => t.id === task.id);
-        set({
-          workspace: {
-            ...ws,
-            tasks: exists
-              ? ws.tasks.map((t) => (t.id === task.id ? task : t))
-              : [...ws.tasks, task],
-          },
-        });
-      },
-      removeTask: (taskId) => {
-        const ws = requireWs(get().workspace);
-        set({
-          workspace: {
-            ...ws,
-            tasks: ws.tasks.filter((t) => t.id !== taskId),
-          },
-        });
-      },
-      upsertGuest: (guest) => {
-        const ws = requireWs(get().workspace);
-        const exists = ws.guests.some((g) => g.id === guest.id);
-        set({
-          workspace: {
-            ...ws,
-            guests: exists
-              ? ws.guests.map((g) => (g.id === guest.id ? guest : g))
-              : [...ws.guests, guest],
-          },
-        });
-      },
-      removeGuest: (guestId) => {
-        const ws = requireWs(get().workspace);
-        set({
-          workspace: {
-            ...ws,
-            guests: ws.guests.filter((g) => g.id !== guestId),
-          },
-        });
-      },
-      upsertGift: (gift) => {
-        const ws = requireWs(get().workspace);
-        const exists = ws.gifts.some((g) => g.id === gift.id);
-        set({
-          workspace: {
-            ...ws,
-            gifts: exists
-              ? ws.gifts.map((g) => (g.id === gift.id ? gift : g))
-              : [...ws.gifts, gift],
-          },
-        });
-      },
-      removeGift: (giftId) => {
-        const ws = requireWs(get().workspace);
-        set({
-          workspace: {
-            ...ws,
-            gifts: ws.gifts.filter((g) => g.id !== giftId),
-          },
-        });
-      },
-      upsertDecision: (decision) => {
-        const ws = requireWs(get().workspace);
-        const exists = ws.decisions.some((d) => d.id === decision.id);
-        set({
-          workspace: {
-            ...ws,
-            decisions: exists
-              ? ws.decisions.map((d) => (d.id === decision.id ? decision : d))
-              : [...ws.decisions, decision],
-          },
-        });
-      },
-      removeDecision: (decisionId) => {
-        const ws = requireWs(get().workspace);
-        set({
-          workspace: {
-            ...ws,
-            decisions: ws.decisions.filter((d) => d.id !== decisionId),
-          },
-        });
-      },
-      upsertHoneymoonItem: (item) => {
-        const ws = requireWs(get().workspace);
-        const exists = ws.honeymoonItems.some((h) => h.id === item.id);
-        set({
-          workspace: {
-            ...ws,
-            honeymoonItems: exists
-              ? ws.honeymoonItems.map((h) => (h.id === item.id ? item : h))
-              : [...ws.honeymoonItems, item],
-          },
-        });
-      },
-      applyBudgetCuts: (updates) => {
-        const ws = requireWs(get().workspace);
-        const map = new Map(updates.map((u) => [u.id, u]));
-        set({
-          workspace: {
-            ...ws,
-            budgetItems: ws.budgetItems.map((item) => {
-              const u = map.get(item.id);
-              if (!u) return item;
-              return {
-                ...item,
-                plannedAmount: u.plannedAmount,
-                contractedAmount:
-                  item.contractedAmount != null
-                    ? Math.min(item.contractedAmount, u.plannedAmount)
-                    : item.contractedAmount,
-                status: u.status ?? item.status,
-              };
-            }),
-          },
-        });
-      },
-      updateWedding: (patch) => {
-        const ws = requireWs(get().workspace);
-        set({
-          workspace: {
-            ...ws,
-            wedding: { ...ws.wedding, ...patch },
-          },
-        });
-      },
-    }),
-    {
-      name: "wedding-planner-mvp",
-      partialize: (s) => ({
-        session: s.session,
-        workspace: s.workspace,
-      }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHydrated(true);
-      },
-    },
-  ),
-);
+export const useWeddingStore = create<WeddingStore>((set, get) => ({
+  hydrated: false,
+  loading: false,
+  session: null,
+  workspace: null,
+
+  hydrate: async () => {
+    set({ loading: true });
+    await reload(set);
+  },
+
+  refresh: async () => {
+    await reload(set);
+  },
+
+  completeOnboarding: async (input) => {
+    const res = await completeOnboardingAction(input);
+    if (res.ok) await reload(set);
+    return res;
+  },
+
+  logout: async () => {
+    await signOutAction();
+    set({ session: null, workspace: null, hydrated: true });
+  },
+
+  upsertBudgetItem: async (item) => {
+    await upsertBudgetItemAction(item);
+    await get().refresh();
+  },
+  removeBudgetItem: async (id) => {
+    await removeBudgetItemAction(id);
+    await get().refresh();
+  },
+  applyBudgetCuts: async (updates) => {
+    await applyBudgetCutsAction(updates);
+    await get().refresh();
+  },
+  upsertVendor: async (vendor) => {
+    await upsertVendorAction(vendor);
+    await get().refresh();
+  },
+  removeVendor: async (id) => {
+    await removeVendorAction(id);
+    await get().refresh();
+  },
+  upsertTask: async (task) => {
+    await upsertTaskAction(task);
+    await get().refresh();
+  },
+  removeTask: async (id) => {
+    await removeTaskAction(id);
+    await get().refresh();
+  },
+  upsertGuest: async (guest) => {
+    await upsertGuestAction(guest);
+    await get().refresh();
+  },
+  removeGuest: async (id) => {
+    await removeGuestAction(id);
+    await get().refresh();
+  },
+  upsertGift: async (gift) => {
+    await upsertGiftAction(gift);
+    await get().refresh();
+  },
+  removeGift: async (id) => {
+    await removeGiftAction(id);
+    await get().refresh();
+  },
+  upsertDecision: async (decision) => {
+    await upsertDecisionAction(decision);
+    await get().refresh();
+  },
+  removeDecision: async (id) => {
+    await removeDecisionAction(id);
+    await get().refresh();
+  },
+  upsertHoneymoonItem: async (item) => {
+    await upsertHoneymoonItemAction(item);
+    await get().refresh();
+  },
+  updateWedding: async (patch) => {
+    await updateWeddingAction({
+      name: patch.name,
+      weddingDate: patch.weddingDate,
+      totalBudget: patch.totalBudget,
+      city: patch.city,
+      venue: patch.venue,
+    });
+    await get().refresh();
+  },
+}));

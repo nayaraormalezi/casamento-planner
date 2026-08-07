@@ -6,33 +6,47 @@ import { useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
 import { useWeddingStore } from "@/lib/demo/store";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const login = useWeddingStore((s) => s.login);
-  const workspace = useWeddingStore((s) => s.workspace);
-  const loadDemo = useWeddingStore((s) => s.loadDemo);
-  const [email, setEmail] = useState("ana@example.com");
-  const [password, setPassword] = useState("demo1234");
+  const hydrate = useWeddingStore((s) => s.hydrate);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    login(email, email.split("@")[0]);
-    const next = params.get("next");
-    if (next) {
-      router.push(next);
-      return;
+    setError(null);
+    setPending(true);
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+      await hydrate();
+      const next = params.get("next");
+      const ws = useWeddingStore.getState().workspace;
+      if (next) {
+        router.push(next);
+        return;
+      }
+      if (ws?.wedding.onboardingDone) router.push("/app/dashboard");
+      else router.push("/onboarding");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao entrar");
+    } finally {
+      setPending(false);
     }
-    if (workspace?.wedding.onboardingDone) router.push("/app/dashboard");
-    else router.push("/onboarding");
-  }
-
-  function enterDemo() {
-    login("ana@example.com", "Ana");
-    loadDemo();
-    router.push("/app/dashboard");
   }
 
   return (
@@ -43,7 +57,7 @@ function LoginForm() {
         </p>
         <h1 className="mt-2 text-lg font-medium text-ink">Entrar na sua conta</h1>
         <p className="mt-1 text-sm text-ink-tertiary">
-          MVP demo — autenticação local (Supabase na próxima conexão).
+          Autenticação via Supabase.
         </p>
 
         <form onSubmit={submit} className="mt-6 space-y-4">
@@ -54,6 +68,7 @@ function LoginForm() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
             />
           </div>
@@ -64,22 +79,19 @@ function LoginForm() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               required
             />
           </div>
-          <Button type="submit" className="w-full">
-            Entrar
+          {error ? (
+            <p className="text-sm text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? "Entrando…" : "Entrar"}
           </Button>
         </form>
-
-        <Button
-          type="button"
-          variant="secondary"
-          className="mt-3 w-full"
-          onClick={enterDemo}
-        >
-          Explorar com dados demo
-        </Button>
 
         <p className="mt-6 text-center text-sm text-ink-tertiary">
           Não tem conta?{" "}

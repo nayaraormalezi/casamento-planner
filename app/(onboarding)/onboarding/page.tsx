@@ -14,6 +14,8 @@ export default function OnboardingPage() {
   const router = useRouter();
   const session = useWeddingStore((s) => s.session);
   const workspace = useWeddingStore((s) => s.workspace);
+  const hydrated = useWeddingStore((s) => s.hydrated);
+  const hydrate = useWeddingStore((s) => s.hydrate);
   const completeOnboarding = useWeddingStore((s) => s.completeOnboarding);
   const [step, setStep] = useState(1);
   const [partnerOneName, setPartnerOne] = useState("");
@@ -23,11 +25,18 @@ export default function OnboardingPage() {
   const [city, setCity] = useState("");
   const [venue, setVenue] = useState("");
   const [styleTags, setStyleTags] = useState("clássico, jardim");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
+    if (!hydrated) void hydrate();
+  }, [hydrated, hydrate]);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (!session) router.replace("/login?next=/onboarding");
     else if (workspace?.wedding.onboardingDone) router.replace("/app/dashboard");
-  }, [session, workspace, router]);
+  }, [hydrated, session, workspace, router]);
 
   function next() {
     if (step < TOTAL_STEPS) setStep((s) => s + 1);
@@ -37,24 +46,45 @@ export default function OnboardingPage() {
     if (step > 1) setStep((s) => s - 1);
   }
 
-  function finish() {
-    completeOnboarding({
-      partnerOneName,
-      partnerTwoName,
-      weddingDate,
-      totalBudgetReais: Number(totalBudgetReais.replace(/\D/g, "")) || 0,
-      city,
-      venue,
-      styleTags: styleTags
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    });
+  async function finish() {
+    setError(null);
+    setPending(true);
     setStep(TOTAL_STEPS);
-    setTimeout(() => router.push("/app/dashboard"), 900);
+    try {
+      const res = await completeOnboarding({
+        partnerOneName,
+        partnerTwoName,
+        weddingDate,
+        totalBudgetReais: Number(totalBudgetReais.replace(/\D/g, "")) || 0,
+        city,
+        venue,
+        styleTags: styleTags
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      });
+      if (!res.ok) {
+        setError(res.error ?? "Não foi possível concluir o onboarding");
+        setStep(6);
+        return;
+      }
+      router.push("/app/dashboard");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro no onboarding");
+      setStep(6);
+    } finally {
+      setPending(false);
+    }
   }
 
-  if (!session) return null;
+  if (!hydrated || !session) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-sm text-ink-tertiary">
+        Carregando…
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center px-4 py-12">
@@ -191,11 +221,18 @@ export default function OnboardingPage() {
               onChange={(e) => setStyleTags(e.target.value)}
               placeholder="clássico, moderno, jardim"
             />
+            {error ? (
+              <p className="text-sm text-danger" role="alert">
+                {error}
+              </p>
+            ) : null}
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={back}>
+              <Button variant="secondary" onClick={back} disabled={pending}>
                 Voltar
               </Button>
-              <Button onClick={finish}>Gerar meu plano</Button>
+              <Button onClick={finish} disabled={pending}>
+                {pending ? "Gerando…" : "Gerar meu plano"}
+              </Button>
             </div>
           </div>
         )}

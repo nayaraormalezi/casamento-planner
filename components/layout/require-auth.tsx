@@ -10,6 +10,12 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const session = useWeddingStore((s) => s.session);
   const workspace = useWeddingStore((s) => s.workspace);
   const hydrated = useWeddingStore((s) => s.hydrated);
+  const loading = useWeddingStore((s) => s.loading);
+  const hydrate = useWeddingStore((s) => s.hydrate);
+
+  useEffect(() => {
+    if (!hydrated && !loading) void hydrate();
+  }, [hydrated, loading, hydrate]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -22,9 +28,20 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     }
   }, [hydrated, session, workspace, pathname, router]);
 
-  if (!hydrated || !session) return null;
-  if (!workspace?.wedding.onboardingDone && !pathname.startsWith("/onboarding"))
-    return null;
+  if (!hydrated || !session) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-sm text-ink-tertiary">
+        Carregando…
+      </div>
+    );
+  }
+  if (!workspace?.wedding.onboardingDone && !pathname.startsWith("/onboarding")) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-sm text-ink-tertiary">
+        Carregando…
+      </div>
+    );
+  }
 
   return children;
 }

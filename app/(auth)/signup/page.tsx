@@ -6,19 +6,51 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
 import { useWeddingStore } from "@/lib/demo/store";
 
 export default function SignupPage() {
   const router = useRouter();
-  const login = useWeddingStore((s) => s.login);
+  const hydrate = useWeddingStore((s) => s.hydrate);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    login(email, name);
-    router.push("/onboarding");
+    setError(null);
+    setInfo(null);
+    setPending(true);
+    try {
+      const supabase = createClient();
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: name },
+        },
+      });
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+      if (data.session) {
+        await hydrate();
+        router.push("/onboarding");
+        router.refresh();
+        return;
+      }
+      setInfo(
+        "Conta criada. Confirme o email (se a confirmação estiver ativa) e depois entre.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao criar conta");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -45,6 +77,7 @@ export default function SignupPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
             />
           </div>
@@ -55,12 +88,23 @@ export default function SignupPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
               required
               minLength={6}
             />
           </div>
-          <Button type="submit" className="w-full">
-            Continuar
+          {error ? (
+            <p className="text-sm text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {info ? (
+            <p className="text-sm text-ink-secondary" role="status">
+              {info}
+            </p>
+          ) : null}
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? "Criando…" : "Continuar"}
           </Button>
         </form>
         <p className="mt-6 text-center text-sm text-ink-tertiary">
