@@ -62,13 +62,13 @@ const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
   { value: "done", label: "Concluído" },
 ];
 
-function newId(prefix: string) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+function newId() {
+  return crypto.randomUUID();
 }
 
 function emptyOption(taskId: string): TaskBudgetOption {
   return {
-    id: newId("opt"),
+    id: newId(),
     taskId,
     title: "",
     vendorId: null,
@@ -101,7 +101,7 @@ function buildInstallments(
       dueDate = d.toISOString().slice(0, 10);
     }
     return {
-      id: newId("inst"),
+      id: newId(),
       sequence: i + 1,
       amount: base + (i === 0 ? remainder : 0),
       dueDate,
@@ -140,7 +140,7 @@ export default function TasksPage() {
 
   function openNew() {
     setDraft({
-      id: newId("task"),
+      id: newId(),
       title: "",
       description: "",
       phase: currentPhase(dash.daysRemaining),
@@ -867,7 +867,7 @@ export default function TasksPage() {
               <SheetFooter>
                 <Button
                   className="flex-1"
-                  onClick={() => {
+                  onClick={async () => {
                     if (!draft.title.trim()) {
                       toast.error("Informe o título");
                       return;
@@ -878,9 +878,25 @@ export default function TasksPage() {
                         return;
                       }
                     }
-                    upsert(draft);
-                    toast.success("Tarefa salva");
-                    setOpen(false);
+                    try {
+                      await upsert({
+                        ...draft,
+                        vendorId: draft.vendorId || null,
+                        budgetItemId: draft.budgetItemId || null,
+                        budgetOptions: draft.budgetOptions.map((o) => ({
+                          ...o,
+                          vendorId: o.vendorId || null,
+                        })),
+                      });
+                      toast.success("Tarefa salva");
+                      setOpen(false);
+                    } catch (err) {
+                      toast.error(
+                        err instanceof Error
+                          ? err.message
+                          : "Não foi possível salvar a tarefa",
+                      );
+                    }
                   }}
                 >
                   Salvar

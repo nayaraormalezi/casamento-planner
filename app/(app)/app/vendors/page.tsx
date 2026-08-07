@@ -30,7 +30,7 @@ import type { Vendor, VendorStatus } from "@/types/domain";
 import { Truck } from "lucide-react";
 
 function newId() {
-  return `ven_${Math.random().toString(36).slice(2, 10)}`;
+  return crypto.randomUUID();
 }
 
 export default function VendorsPage() {

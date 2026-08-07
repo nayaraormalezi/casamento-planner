@@ -193,6 +193,9 @@ export async function applyBudgetCutsAction(
 export async function upsertTaskAction(task: Task) {
   const ctx = await requireMembership(["owner", "partner", "collaborator"]);
 
+  const vendorId = task.vendorId || null;
+  const budgetItemId = task.budgetItemId || null;
+
   await prisma.task.upsert({
     where: { id: task.id },
     create: {
@@ -208,9 +211,9 @@ export async function upsertTaskAction(task: Task) {
       startDate: parseDate(task.startDate),
       status: task.status,
       isMilestone: task.isMilestone,
-      assigneeId: task.assignee,
-      vendorId: task.vendorId,
-      budgetItemId: task.budgetItemId,
+      assigneeId: task.assignee || null,
+      vendorId,
+      budgetItemId,
       templateKey: task.templateKey,
     },
     update: {
@@ -223,13 +226,16 @@ export async function upsertTaskAction(task: Task) {
       startDate: parseDate(task.startDate),
       status: task.status,
       isMilestone: task.isMilestone,
-      assigneeId: task.assignee,
-      vendorId: task.vendorId,
-      budgetItemId: task.budgetItemId,
+      assigneeId: task.assignee || null,
+      vendorId,
+      budgetItemId,
     },
   });
 
-  const options = task.budgetOptions ?? [];
+  const options = (task.budgetOptions ?? []).map((o) => ({
+    ...o,
+    vendorId: o.vendorId || null,
+  }));
   const keepIds = options.map((o) => o.id);
 
   await prisma.taskBudgetOption.deleteMany({
