@@ -1,0 +1,93 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+@theme inline {
+  --color-canvas: var(--wp-canvas);
+  --color-canvas-elevated: var(--wp-canvas-elevated);
+  --color-canvas-muted: var(--wp-canvas-muted);
+  --color-ink: var(--wp-ink);
+  --color-ink-secondary: var(--wp-ink-secondary);
+  --color-ink-tertiary: var(--wp-ink-tertiary);
+  --color-ink-disabled: var(--wp-ink-disabled);
+  --color-ink-inverse: var(--wp-ink-inverse);
+  --color-accent: var(--wp-accent);
+  --color-accent-hover: var(--wp-accent-hover);
+  --color-accent-subtle: var(--wp-accent-subtle);
+  --color-accent-foreground: var(--wp-accent-foreground);
+  --color-primary: var(--wp-primary);
+  --color-primary-hover: var(--wp-primary-hover);
+  --color-primary-foreground: var(--wp-primary-foreground);
+  --color-border: var(--wp-border);
+  --color-border-strong: var(--wp-border-strong);
+  --color-ring: var(--wp-ring);
+  --color-success: var(--wp-success);
+  --color-success-subtle: var(--wp-success-subtle);
+  --color-warning: var(--wp-warning);
+  --color-warning-subtle: var(--wp-warning-subtle);
+  --color-danger: var(--wp-danger);
+  --color-danger-subtle: var(--wp-danger-subtle);
+  --color-info: var(--wp-info);
+  --color-info-subtle: var(--wp-info-subtle);
+  --color-critical: var(--wp-critical);
+  --color-critical-subtle: var(--wp-critical-subtle);
+  --color-priority-5: var(--wp-priority-5);
+  --color-priority-4: var(--wp-priority-4);
+  --color-priority-3: var(--wp-priority-3);
+  --color-priority-2: var(--wp-priority-2);
+  --color-priority-1: var(--wp-priority-1);
+  --color-chart-1: var(--wp-chart-1);
+  --color-chart-2: var(--wp-chart-2);
+  --color-chart-3: var(--wp-chart-3);
+  --color-chart-4: var(--wp-chart-4);
+  --color-chart-5: var(--wp-chart-5);
+  --color-chart-6: var(--wp-chart-6);
+  --color-chart-grid: var(--wp-chart-grid);
+
+  --font-display: var(--wp-font-display);
+  --font-sans: var(--wp-font-sans);
+  --font-mono: var(--wp-font-mono);
+
+  --radius-sm: var(--wp-radius-sm);
+  --radius-md: var(--wp-radius-md);
+  --radius-lg: var(--wp-radius-lg);
+  --radius-xl: var(--wp-radius-xl);
+
+  --shadow-sm: var(--wp-shadow-sm);
+  --shadow-md: var(--wp-shadow-md);
+  --shadow-lg: var(--wp-shadow-lg);
+
+  --animate-fade-rise: fade-rise var(--wp-duration-normal) var(--wp-ease-out);
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink;
+    background-image: var(--wp-atmosphere);
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background: var(--wp-accent-subtle);
+    color: var(--wp-ink);
+  }
+}

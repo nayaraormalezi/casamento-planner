@@ -1,0 +1,30 @@
+"use client";
+
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useWeddingStore } from "@/lib/demo/store";
+
+export function RequireAuth({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const session = useWeddingStore((s) => s.session);
+  const workspace = useWeddingStore((s) => s.workspace);
+  const hydrated = useWeddingStore((s) => s.hydrated);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!session) {
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      return;
+    }
+    if (!workspace?.wedding.onboardingDone && !pathname.startsWith("/onboarding")) {
+      router.replace("/onboarding");
+    }
+  }, [hydrated, session, workspace, pathname, router]);
+
+  if (!hydrated || !session) return null;
+  if (!workspace?.wedding.onboardingDone && !pathname.startsWith("/onboarding"))
+    return null;
+
+  return children;
+}

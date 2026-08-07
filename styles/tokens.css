@@ -1,0 +1,152 @@
+/* Wedding Planner — Design Tokens
+ * Source of truth for CSS variables. Mapped to Tailwind in implementation.
+ * Direction: luminous white, ink, champagne accent — luxurious minimal.
+ */
+
+:root {
+  /* ─── Canvas & atmosphere ─── */
+  --wp-canvas: #f5f6f8;
+  --wp-canvas-elevated: #ffffff;
+  --wp-canvas-muted: #eef0f3;
+  --wp-atmosphere:
+    radial-gradient(1200px 600px at 10% -10%, rgba(196, 168, 125, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(90, 110, 140, 0.06), transparent 50%),
+    var(--wp-canvas);
+
+  /* ─── Ink (text) ─── */
+  --wp-ink: #12141a;
+  --wp-ink-secondary: #3c4250;
+  --wp-ink-tertiary: #6b7280;
+  --wp-ink-disabled: #9aa1ad;
+  --wp-ink-inverse: #f8f9fb;
+
+  /* ─── Accent — champagne bronze (luxury, not purple/terracotta cliché) ─── */
+  --wp-accent: #9a7b4f;
+  --wp-accent-hover: #83683f;
+  --wp-accent-subtle: rgba(154, 123, 79, 0.12);
+  --wp-accent-foreground: #ffffff;
+
+  /* ─── Primary action — ink (Linear/Apple weight) ─── */
+  --wp-primary: #12141a;
+  --wp-primary-hover: #2a2e38;
+  --wp-primary-foreground: #f8f9fb;
+
+  /* ─── Borders & rings ─── */
+  --wp-border: rgba(18, 20, 26, 0.08);
+  --wp-border-strong: rgba(18, 20, 26, 0.16);
+  --wp-ring: rgba(154, 123, 79, 0.45);
+
+  /* ─── Semantic ─── */
+  --wp-success: #1f6b4a;
+  --wp-success-subtle: rgba(31, 107, 74, 0.1);
+  --wp-warning: #9a6700;
+  --wp-warning-subtle: rgba(154, 103, 0, 0.12);
+  --wp-danger: #b42318;
+  --wp-danger-subtle: rgba(180, 35, 24, 0.1);
+  --wp-info: #3d5a80;
+  --wp-info-subtle: rgba(61, 90, 128, 0.1);
+
+  /* Severity (alerts) */
+  --wp-critical: #b42318;
+  --wp-critical-subtle: rgba(180, 35, 24, 0.08);
+
+  /* ─── Priority scale ─── */
+  --wp-priority-5: #b42318;
+  --wp-priority-4: #c2410c;
+  --wp-priority-3: #9a7b4f;
+  --wp-priority-2: #6b7280;
+  --wp-priority-1: #9aa1ad;
+
+  /* ─── Typography families ─── */
+  --wp-font-display: var(--font-syne), "Syne", ui-sans-serif, sans-serif;
+  --wp-font-sans: var(--font-manrope), "Manrope", ui-sans-serif, sans-serif;
+  --wp-font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+
+  /* ─── Type scale (rem @ 16px) ─── */
+  --wp-text-xs: 0.75rem;
+  --wp-text-sm: 0.875rem;
+  --wp-text-base: 1rem;
+  --wp-text-lg: 1.125rem;
+  --wp-text-xl: 1.25rem;
+  --wp-text-2xl: 1.5rem;
+  --wp-text-3xl: 1.875rem;
+  --wp-text-4xl: 2.25rem;
+  --wp-text-5xl: 3rem;
+  --wp-text-hero: clamp(2.75rem, 6vw, 4.5rem);
+
+  --wp-leading-tight: 1.15;
+  --wp-leading-snug: 1.35;
+  --wp-leading-normal: 1.5;
+  --wp-leading-relaxed: 1.65;
+
+  --wp-tracking-tight: -0.03em;
+  --wp-tracking-normal: 0;
+  --wp-tracking-wide: 0.04em;
+
+  /* ─── Spacing (4px base) ─── */
+  --wp-space-0: 0;
+  --wp-space-1: 0.25rem;
+  --wp-space-2: 0.5rem;
+  --wp-space-3: 0.75rem;
+  --wp-space-4: 1rem;
+  --wp-space-5: 1.25rem;
+  --wp-space-6: 1.5rem;
+  --wp-space-8: 2rem;
+  --wp-space-10: 2.5rem;
+  --wp-space-12: 3rem;
+  --wp-space-16: 4rem;
+  --wp-space-20: 5rem;
+  --wp-space-24: 6rem;
+
+  /* ─── Radii (restrained — not pill-default) ─── */
+  --wp-radius-sm: 6px;
+  --wp-radius-md: 10px;
+  --wp-radius-lg: 14px;
+  --wp-radius-xl: 20px;
+  --wp-radius-full: 9999px; /* use sparingly: avatars only */
+
+  /* ─── Elevation (single soft layer — no stack of shadows) ─── */
+  --wp-shadow-sm: 0 1px 2px rgba(18, 20, 26, 0.04);
+  --wp-shadow-md: 0 8px 24px rgba(18, 20, 26, 0.06);
+  --wp-shadow-lg: 0 16px 48px rgba(18, 20, 26, 0.08);
+
+  /* ─── Layout ─── */
+  --wp-sidebar-width: 240px;
+  --wp-sidebar-collapsed: 72px;
+  --wp-topbar-height: 56px;
+  --wp-drawer-width: 440px;
+  --wp-content-max: 1200px;
+  --wp-reading-max: 680px;
+
+  /* ─── Motion ─── */
+  --wp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --wp-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --wp-duration-fast: 150ms;
+  --wp-duration-normal: 220ms;
+  --wp-duration-slow: 360ms;
+
+  /* ─── Z-index ─── */
+  --wp-z-base: 0;
+  --wp-z-sticky: 20;
+  --wp-z-drawer: 40;
+  --wp-z-modal: 50;
+  --wp-z-toast: 60;
+  --wp-z-popover: 70;
+
+  /* ─── Charts ─── */
+  --wp-chart-1: #12141a;
+  --wp-chart-2: #9a7b4f;
+  --wp-chart-3: #3d5a80;
+  --wp-chart-4: #1f6b4a;
+  --wp-chart-5: #6b7280;
+  --wp-chart-6: #c4a87d;
+  --wp-chart-grid: rgba(18, 20, 26, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wp-duration-fast: 0ms;
+    --wp-duration-normal: 0ms;
+    --wp-duration-slow: 0ms;
+  }
+}
