@@ -207,6 +207,7 @@ export default function TasksPage() {
               ["now", "Agora"],
               ["soon", "Próximas"],
               ["later", "Depois"],
+              ["areas", "Por área"],
               ["all", "Todas"],
               ["done", "Concluídas"],
             ] as const

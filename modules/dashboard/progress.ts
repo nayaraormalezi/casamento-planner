@@ -19,11 +19,12 @@ function taskWeight(task: Task): number {
 function winLabel(task: Task): string | null {
   const key = task.templateKey ?? "";
   if (key.includes("set_budget")) return "Definiu o orçamento";
-  if (key.includes("set_date")) return "Definiu a data e o estilo";
+  if (key.includes("set_date")) return "Definiu a data e o horário";
+  if (key.includes("set_style")) return "Definiu o estilo do casamento";
   if (key.includes("lock_venue")) return "Fechou o local";
   if (key.includes("guest_list")) return "Criou a lista inicial de convidados";
-  if (key.includes("research_catering")) return "Pesquisou buffets";
-  if (key.includes("hire_photo")) return "Contrato de foto/vídeo encaminhado";
+  if (key.includes("hire_catering")) return "Definiu o buffet";
+  if (key.includes("hire_photo")) return "Definiu o fotógrafo";
   if (key.includes("send_invites")) return "Enviou convites";
   if (task.isMilestone) return task.title;
   return null;

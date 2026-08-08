@@ -10,10 +10,16 @@ import {
   type ChecklistGroups,
   type ChecklistItem,
 } from "@/modules/tasks/checklist";
+import { areaLabelForTask } from "@/modules/tasks/module-links";
+import {
+  groupSlugFromTemplateKey,
+  TASK_GROUP_META,
+  type TaskGroupSlug,
+} from "@/prisma/seed-catalog";
 import type { Task, WeddingWorkspace } from "@/types/domain";
 import { cn, formatMoneyBRL } from "@/utils/cn";
 
-export type ChecklistView = ChecklistBucket | "all" | "focus";
+export type ChecklistView = ChecklistBucket | "all" | "focus" | "areas";
 
 type ChecklistBoardProps = {
   workspace: WeddingWorkspace;
@@ -80,6 +86,9 @@ function TaskRow({
             ) : null}
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <span className={tone}>{item.dueLabel}</span>
+              {areaLabelForTask(task) ? (
+                <span className="text-ink-tertiary">{areaLabelForTask(task)}</span>
+              ) : null}
               <span className="text-ink-tertiary">{item.moduleLabel}</span>
               {task.status === "doing" ? (
                 <StatusBadge status="doing" />
@@ -196,6 +205,63 @@ export function ChecklistBoard({
           </ul>
         )}
       </section>
+    );
+  }
+
+  if (view === "areas") {
+    const all = [
+      ...groups.now,
+      ...groups.soon,
+      ...groups.later,
+      ...groups.done,
+    ];
+    const byGroup = new Map<TaskGroupSlug | "other", ChecklistItem[]>();
+    for (const item of all) {
+      const group = groupSlugFromTemplateKey(item.task.templateKey) ?? "other";
+      const list = byGroup.get(group) ?? [];
+      list.push(item);
+      byGroup.set(group, list);
+    }
+    const ordered = [
+      ...(Object.keys(TASK_GROUP_META) as TaskGroupSlug[]),
+      "other" as const,
+    ].filter((g) => (byGroup.get(g)?.length ?? 0) > 0);
+
+    return (
+      <div className="space-y-8 sm:space-y-10">
+        {ordered.map((group) => {
+          const items = byGroup.get(group) ?? [];
+          const meta =
+            group === "other"
+              ? { emoji: "📌", label: "Outras" }
+              : TASK_GROUP_META[group];
+          return (
+            <section key={group} className="space-y-3">
+              <div>
+                <h2 className="font-display text-base font-semibold text-ink sm:text-lg">
+                  {meta.emoji} {meta.label}
+                </h2>
+                <p className="mt-0.5 text-sm text-ink-tertiary">
+                  {items.filter((i) => i.task.status !== "done").length} abertas
+                  · {items.filter((i) => i.task.status === "done").length}{" "}
+                  concluídas
+                </p>
+              </div>
+              <ul className="space-y-2">
+                {items.map((item) => (
+                  <TaskRow
+                    key={item.task.id}
+                    item={item}
+                    workspace={workspace}
+                    onToggleDone={onToggleDone}
+                    onOpenTask={onOpenTask}
+                  />
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
     );
   }
 

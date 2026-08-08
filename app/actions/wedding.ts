@@ -38,8 +38,19 @@ export async function getWorkspaceAction(): Promise<{
   error?: string;
 }> {
   try {
-    const { workspace } = await loadWorkspaceForUser();
-    return { ok: true, workspace };
+    const loaded = await loadWorkspaceForUser();
+    if (loaded.workspace && loaded.workspaceId && loaded.weddingId) {
+      const { ensureCatalogAndSyncFeatures } = await import(
+        "@/modules/tasks/sync-server"
+      );
+      await ensureCatalogAndSyncFeatures({
+        workspaceId: loaded.workspaceId,
+        weddingId: loaded.weddingId,
+      });
+      const refreshed = await loadWorkspaceForUser();
+      return { ok: true, workspace: refreshed.workspace };
+    }
+    return { ok: true, workspace: loaded.workspace };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "ERROR";
     if (msg === "UNAUTHORIZED") {
@@ -152,8 +163,11 @@ export async function upsertBudgetItemAction(item: BudgetItem) {
       emotionalReturn: item.emotionalReturn,
     },
   });
+  const { syncTasksFromFeatures } = await import("@/modules/tasks/sync-server");
+  await syncTasksFromFeatures();
   revalidatePath("/app/budget");
   revalidatePath("/app/dashboard");
+  revalidatePath("/app/tasks");
   return { ok: true as const };
 }
 
@@ -400,9 +414,21 @@ export async function upsertTaskAction(task: Task) {
     }
   }
 
+  const { syncFeaturesFromTask, syncTasksFromFeatures } = await import(
+    "@/modules/tasks/sync-server"
+  );
+  await syncFeaturesFromTask(task, {
+    workspaceId: ctx.workspaceId,
+    weddingId: ctx.weddingId,
+  });
+  await syncTasksFromFeatures();
+
   revalidatePath("/app/tasks");
   revalidatePath("/app/schedule");
   revalidatePath("/app/dashboard");
+  revalidatePath("/app/budget");
+  revalidatePath("/app/vendors");
+  revalidatePath("/app/settings");
   return { ok: true as const };
 }
 
@@ -474,7 +500,11 @@ export async function upsertVendorAction(vendor: Vendor) {
       status: vendor.status,
     },
   });
+  const { syncTasksFromFeatures } = await import("@/modules/tasks/sync-server");
+  await syncTasksFromFeatures();
   revalidatePath("/app/vendors");
+  revalidatePath("/app/tasks");
+  revalidatePath("/app/dashboard");
   return { ok: true as const };
 }
 
@@ -518,7 +548,11 @@ export async function upsertGuestAction(guest: Guest) {
       notes: guest.notes || null,
     },
   });
+  const { syncTasksFromFeatures } = await import("@/modules/tasks/sync-server");
+  await syncTasksFromFeatures();
   revalidatePath("/app/guests");
+  revalidatePath("/app/tasks");
+  revalidatePath("/app/dashboard");
   return { ok: true as const };
 }
 
@@ -558,7 +592,10 @@ export async function upsertGiftAction(gift: Gift) {
       thankYouSent: gift.thankYouSent,
     },
   });
+  const { syncTasksFromFeatures } = await import("@/modules/tasks/sync-server");
+  await syncTasksFromFeatures();
   revalidatePath("/app/gifts");
+  revalidatePath("/app/tasks");
   return { ok: true as const };
 }
 
@@ -647,7 +684,10 @@ export async function upsertHoneymoonItemAction(item: HoneymoonItem) {
       status: item.status,
     },
   });
+  const { syncTasksFromFeatures } = await import("@/modules/tasks/sync-server");
+  await syncTasksFromFeatures();
   revalidatePath("/app/honeymoon");
+  revalidatePath("/app/tasks");
   return { ok: true as const };
 }
 
@@ -658,6 +698,7 @@ export async function updateWeddingAction(
     totalBudget: number;
     city: string;
     venue: string;
+    styleTags: string[];
   }>,
 ) {
   const ctx = await requireMembership(["owner", "partner"]);
@@ -671,8 +712,11 @@ export async function updateWeddingAction(
       ...(patch.totalBudget != null ? { totalBudget: patch.totalBudget } : {}),
       ...(patch.city != null ? { city: patch.city } : {}),
       ...(patch.venue != null ? { venue: patch.venue } : {}),
+      ...(patch.styleTags != null ? { styleTags: patch.styleTags } : {}),
     },
   });
+  const { syncTasksFromFeatures } = await import("@/modules/tasks/sync-server");
+  await syncTasksFromFeatures();
   revalidatePath("/app");
   return { ok: true as const };
 }

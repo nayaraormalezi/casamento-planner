@@ -53,12 +53,15 @@ function phaseCompletion(ws: WeddingWorkspace): Record<JourneyPhaseId, boolean> 
     (taskDone(tasks, "set_budget") ||
       ws.budgetItems.some((i) => i.status !== "cancelled"));
   const dateOk = Boolean(ws.wedding.weddingDate) || taskDone(tasks, "set_date");
-  const venueOk = hasVenueVendor || taskDone(tasks, "lock_venue");
+  const venueOk =
+    hasVenueVendor ||
+    Boolean(ws.wedding.venue?.trim()) ||
+    taskDone(tasks, "lock_venue");
 
   const initialDone = budgetOk && dateOk && venueOk;
 
   const vendorsDone =
-    (hasCatering || taskDone(tasks, "research_catering") || taskDone(tasks, "tasting")) &&
+    (hasCatering || taskDone(tasks, "hire_catering")) &&
     (hasPhoto || taskDone(tasks, "hire_photo")) &&
     (hasDecor || taskDone(tasks, "hire_decor") || taskDone(tasks, "hire_music"));
 
@@ -76,13 +79,18 @@ function phaseCompletion(ws: WeddingWorkspace): Record<JourneyPhaseId, boolean> 
   const guestsDone = guestListOk && invitesOk;
 
   const detailsDone =
-    anyTaskDone(tasks, ["attire", "hire_music", "hire_decor"]) ||
+    anyTaskDone(tasks, [
+      "bride_dress",
+      "groom_suit",
+      "hire_music",
+      "hire_decor",
+      "define_honeymoon",
+    ]) ||
     ws.honeymoonItems.length > 0 ||
-    taskDone(tasks, "passport") ||
-    taskDone(tasks, "insurance");
+    taskDone(tasks, "book_honeymoon");
 
   const dayOfDone =
-    taskDone(tasks, "run_of_show") ||
+    taskDone(tasks, "day_schedule") ||
     taskDone(tasks, "confirm_vendors") ||
     taskDone(tasks, "final_guest_count");
 

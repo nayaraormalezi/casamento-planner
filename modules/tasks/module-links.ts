@@ -1,4 +1,8 @@
 import type { Task } from "@/types/domain";
+import {
+  groupSlugFromTemplateKey,
+  TASK_GROUP_META,
+} from "@/prisma/seed-catalog";
 
 export type TaskModule = {
   href: string;
@@ -18,11 +22,25 @@ export function moduleForTask(task: Task): TaskModule {
       actionLabel: "Abrir orçamento",
     };
   }
-  if (key.includes("guest") || key.includes("rsvp") || key.includes("invite")) {
+  if (
+    key.includes("guest_list") ||
+    key.includes("guest_count") ||
+    key.includes("chase_rsvp") ||
+    key.includes("send_invites") ||
+    key.includes("final_guest") ||
+    key.includes("seating")
+  ) {
     return {
       href: "/app/guests",
       label: "Convidados",
       actionLabel: "Abrir convidados",
+    };
+  }
+  if (key.includes("gift_list") || key.includes("thank_you") || key.includes("organize_gifts")) {
+    return {
+      href: "/app/gifts",
+      label: "Presentes",
+      actionLabel: "Abrir presentes",
     };
   }
   if (key.includes("honey") || slug === "honeymoon") {
@@ -32,13 +50,35 @@ export function moduleForTask(task: Task): TaskModule {
       actionLabel: "Abrir lua de mel",
     };
   }
-  if (key.includes("run_of_show") || key.includes("confirm_vendors")) {
+  if (
+    key.includes("day_schedule") ||
+    key.includes("run_of_show") ||
+    key.includes("ceremony_script") ||
+    key.includes("party_script")
+  ) {
     return {
-      href: key.includes("confirm_vendors") ? "/app/vendors" : "/app/schedule",
-      label: key.includes("confirm_vendors") ? "Fornecedores" : "Cronograma",
-      actionLabel: key.includes("confirm_vendors")
-        ? "Abrir fornecedores"
-        : "Abrir cronograma",
+      href: "/app/schedule",
+      label: "Cronograma",
+      actionLabel: "Abrir cronograma",
+    };
+  }
+  if (key.includes("confirm_vendors") || key.includes("organize_contracts")) {
+    return {
+      href: "/app/vendors",
+      label: "Fornecedores",
+      actionLabel: "Abrir fornecedores",
+    };
+  }
+  if (
+    key.includes("set_date") ||
+    key.includes("set_style") ||
+    key.includes("set_priorities") ||
+    key.includes("lock_venue")
+  ) {
+    return {
+      href: "/app/settings",
+      label: "Casamento",
+      actionLabel: "Editar casamento",
     };
   }
   if (
@@ -54,6 +94,11 @@ export function moduleForTask(task: Task): TaskModule {
       "beauty",
       "cake",
       "stationery",
+      "drinks",
+      "transport",
+      "ceremony",
+      "favors",
+      "entertainment",
     ].includes(slug)
   ) {
     return {
@@ -62,19 +107,19 @@ export function moduleForTask(task: Task): TaskModule {
       actionLabel: "Cadastrar fornecedor",
     };
   }
-  if (key.includes("set_date") || key.includes("style")) {
-    return {
-      href: "/app/settings",
-      label: "Configurações",
-      actionLabel: "Editar casamento",
-    };
-  }
 
   return {
     href: `/app/tasks?highlight=${task.id}`,
     label: "Tarefa",
     actionLabel: "Abrir tarefa",
   };
+}
+
+export function areaLabelForTask(task: Task): string | null {
+  const group = groupSlugFromTemplateKey(task.templateKey);
+  if (!group) return null;
+  const meta = TASK_GROUP_META[group];
+  return `${meta.emoji} ${meta.label}`;
 }
 
 export const PHASE_LABEL: Record<Task["phase"], string> = {

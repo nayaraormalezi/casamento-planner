@@ -19,13 +19,16 @@ export type AttentionItem = {
 const WHY_BY_KEY: Record<string, string> = {
   set_budget:
     "Essa decisão libera o planejamento dos fornecedores e das categorias.",
-  set_date:
-    "Data e estilo orientam prazo, disponibilidade e o tom do casamento.",
+  set_date: "Data e horário orientam prazos, disponibilidade e logística.",
+  set_style: "O estilo guia visual, fornecedores e o tom do casamento.",
+  set_priorities: "Prioridades evitam gastar energia no que importa menos.",
+  guest_count: "O número de convidados redefine orçamento, local e buffet.",
   lock_venue:
     "O local influencia quase todas as próximas decisões e contratações.",
-  research_catering:
+  hire_catering:
     "Buffet costuma ser um dos maiores custos — cotar cedo abre opções.",
   hire_photo: "Fotografia boa esgota agenda; priorize enquanto há datas.",
+  hire_video: "Vídeo complementa a memória do dia e agendas esgotam cedo.",
   guest_list: "A lista define tamanho do evento e custo de buffet e espaço.",
   send_invites: "Convites em dia evitam corrida de RSVP perto da data.",
   chase_rsvp: "Confirmações fecham o número final para fornecedores.",
@@ -33,16 +36,22 @@ const WHY_BY_KEY: Record<string, string> = {
   confirm_vendors: "Confirmar fornecedores evita surpresas na reta final.",
   hire_decor: "Decoração amarra o visual do dia e costuma ter lead time.",
   hire_music: "Música define o clima da festa — agendas enchem cedo.",
-  attire: "Trajes pedem prova e ajustes; deixe margem de tempo.",
-  tasting: "Degustação confirma o cardápio antes de fechar detalhes.",
-  run_of_show: "O cronograma do dia alinha família, fornecedores e você.",
+  bride_dress: "O vestido pede provas e ajustes; deixe margem de tempo.",
+  groom_suit: "O traje do noivo também precisa de prova e prazo de ajuste.",
+  day_schedule: "O cronograma do dia alinha família, fornecedores e você.",
+  define_honeymoon: "Definir o destino libera reservas e orçamento da viagem.",
+  civil_marriage:
+    "Prazos de cartório variam — confirme documentos e agenda com antecedência.",
+  religious_ceremony:
+    "Exigências de igreja/celebrante variam — valide prazos locais cedo.",
 };
 
 const EFFORT_BY_KEY: Record<string, string> = {
   set_budget: "~10 min",
   set_date: "~15 min",
+  set_style: "~15 min",
   lock_venue: "~30 min",
-  research_catering: "~1 h",
+  hire_catering: "~1 h",
   hire_photo: "~45 min",
   guest_list: "~30 min",
   send_invites: "~20 min",
@@ -51,9 +60,10 @@ const EFFORT_BY_KEY: Record<string, string> = {
   confirm_vendors: "~20 min",
   hire_decor: "~30 min",
   hire_music: "~30 min",
-  attire: "~45 min",
-  tasting: "~1 h",
-  run_of_show: "~20 min",
+  bride_dress: "~45 min",
+  groom_suit: "~30 min",
+  day_schedule: "~20 min",
+  define_honeymoon: "~30 min",
 };
 
 function keyFragment(templateKey: string | null): string | null {
@@ -107,7 +117,7 @@ function scoreTask(task: Task, today: string): number {
   const key = task.templateKey ?? "";
   if (key.includes("set_budget")) score += 40;
   if (key.includes("lock_venue")) score += 35;
-  if (key.includes("research_catering")) score += 20;
+  if (key.includes("hire_catering")) score += 20;
   if (key.includes("set_date")) score += 30;
   if (task.dueDate) {
     if (task.dueDate < today) score += 50;

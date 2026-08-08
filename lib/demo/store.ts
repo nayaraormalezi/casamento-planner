@@ -229,6 +229,7 @@ export const useWeddingStore = create<WeddingStore>((set, get) => ({
       totalBudget: patch.totalBudget,
       city: patch.city,
       venue: patch.venue,
+      styleTags: patch.styleTags,
     });
     await get().refresh();
   },

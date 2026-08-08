@@ -2,8 +2,8 @@ import { randomUUID } from "crypto";
 import {
   BUDGET_ALLOCATION_BENCHMARK,
   BUDGET_CATEGORY_SEED,
-  PHASE_OFFSET_DAYS,
   TASK_TEMPLATE_SEED,
+  taskSeedDescription,
 } from "@/prisma/seed-catalog";
 import { prismaDirect } from "@/lib/prisma-direct";
 import type { TaskPhase } from "@prisma/client";
@@ -47,6 +47,7 @@ type SeedPlan = {
   tasks: {
     id: string;
     title: string;
+    description: string;
     phase: TaskPhase;
     categorySlug: string | null;
     priority: number;
@@ -54,6 +55,8 @@ type SeedPlan = {
     isMilestone: boolean;
     templateKey: string;
     budgetItemId: string | null;
+    sortOrder: number;
+    status: "todo" | "done";
   }[];
   input: OnboardingInput;
   name: string;
@@ -194,17 +197,29 @@ function buildSeedPlan(
     decisionId: randomUUID(),
     categories,
     seedBudget,
-    tasks: TASK_TEMPLATE_SEED.map((t) => ({
-      id: randomUUID(),
-      title: t.title,
-      phase: t.phase as TaskPhase,
-      categorySlug: t.categorySlug ?? null,
-      priority: t.priority,
-      dueDate: subtractDays(input.weddingDate, PHASE_OFFSET_DAYS[t.phase]),
-      isMilestone: Boolean(t.isMilestone),
-      templateKey: t.templateKey,
-      budgetItemId: t.categorySlug ? budgetBySlug[t.categorySlug] ?? null : null,
-    })),
+    tasks: TASK_TEMPLATE_SEED.map((t, index) => {
+      const doneFromOnboarding =
+        (t.featureLink === "budget" && input.totalBudgetCents > 0) ||
+        (t.featureLink === "date" && Boolean(input.weddingDate)) ||
+        (t.featureLink === "style" && (input.styleTags?.length ?? 0) > 0) ||
+        (t.featureLink === "venue" && Boolean(input.venue?.trim()));
+      return {
+        id: randomUUID(),
+        title: t.title,
+        description: taskSeedDescription(t),
+        phase: (t.phase ?? "m6") as TaskPhase,
+        categorySlug: t.categorySlug ?? null,
+        priority: t.priority,
+        dueDate: subtractDays(input.weddingDate, t.dueOffsetDays),
+        isMilestone: Boolean(t.isMilestone),
+        templateKey: t.templateKey,
+        budgetItemId: t.categorySlug
+          ? budgetBySlug[t.categorySlug] ?? null
+          : null,
+        sortOrder: index,
+        status: doneFromOnboarding ? ("done" as const) : ("todo" as const),
+      };
+    }),
     input,
   };
 }
@@ -251,13 +266,13 @@ function toWorkspace(plan: SeedPlan): WeddingWorkspace {
     tasks: plan.tasks.map((t) => ({
       id: t.id,
       title: t.title,
-      description: "",
+      description: t.description,
       phase: t.phase,
       categorySlug: t.categorySlug,
       priority: t.priority as 1 | 2 | 3 | 4 | 5,
       dueDate: dateStr(t.dueDate),
       startDate: null,
-      status: "todo" as const,
+      status: t.status,
       isMilestone: t.isMilestone,
       assignee: null,
       vendorId: null,
@@ -371,14 +386,16 @@ export async function seedOnboardingExtras(plan: SeedPlan) {
         workspaceId: plan.workspaceId,
         weddingId: plan.weddingId,
         title: t.title,
+        description: t.description,
         phase: t.phase,
         categorySlug: t.categorySlug,
         priority: t.priority,
         dueDate: t.dueDate,
-        status: "todo",
+        status: t.status,
         isMilestone: t.isMilestone,
         templateKey: t.templateKey,
         budgetItemId: t.budgetItemId,
+        sortOrder: t.sortOrder,
       })),
     }),
     prismaDirect.decision.create({

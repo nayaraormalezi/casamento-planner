@@ -1,7 +1,7 @@
 import {
   BUDGET_CATEGORY_SEED,
-  PHASE_OFFSET_DAYS,
   TASK_TEMPLATE_SEED,
+  taskSeedDescription,
 } from "@/prisma/seed-catalog";
 import type {
   BudgetCategory,
@@ -71,23 +71,30 @@ export function buildOnboardingWorkspace(input: {
 
   const catBySlug = Object.fromEntries(categories.map((c) => [c.slug, c]));
 
-  const tasks: Task[] = TASK_TEMPLATE_SEED.map((t) => ({
-    id: id("task"),
-    title: t.title,
-    description: "",
-    phase: t.phase as TaskPhase,
-    categorySlug: t.categorySlug ?? null,
-    priority: t.priority,
-    dueDate: subtractDays(input.weddingDate, PHASE_OFFSET_DAYS[t.phase]),
-    startDate: null,
-    status: "todo",
-    isMilestone: Boolean(t.isMilestone),
-    assignee: null,
-    vendorId: null,
-    budgetItemId: null,
-    templateKey: t.templateKey,
-    budgetOptions: [],
-  }));
+  const tasks: Task[] = TASK_TEMPLATE_SEED.map((t) => {
+    const doneFromOnboarding =
+      (t.featureLink === "budget" && input.totalBudget > 0) ||
+      (t.featureLink === "date" && Boolean(input.weddingDate)) ||
+      (t.featureLink === "style" && (input.styleTags?.length ?? 0) > 0) ||
+      (t.featureLink === "venue" && Boolean(input.venue?.trim()));
+    return {
+      id: id("task"),
+      title: t.title,
+      description: taskSeedDescription(t),
+      phase: (t.phase ?? "m6") as TaskPhase,
+      categorySlug: t.categorySlug ?? null,
+      priority: t.priority,
+      dueDate: subtractDays(input.weddingDate, t.dueOffsetDays),
+      startDate: null,
+      status: doneFromOnboarding ? ("done" as const) : ("todo" as const),
+      isMilestone: Boolean(t.isMilestone),
+      assignee: null,
+      vendorId: null,
+      budgetItemId: null,
+      templateKey: t.templateKey,
+      budgetOptions: [],
+    };
+  });
 
   // Seed a few budget lines so dashboard isn't empty
   const budgetItems: BudgetItem[] = [
@@ -264,7 +271,7 @@ export function buildDemoWorkspace(): WeddingWorkspace {
   const today = new Date().toISOString().slice(0, 10);
   base.tasks = base.tasks.map((t, idx) => {
     if (idx < 2) return { ...t, status: "done" as const };
-    if (t.templateKey === "br.m3.send_invites") {
+    if (t.templateKey === "br.guests.send_invites") {
       return { ...t, dueDate: addDays(today, -5), status: "todo" as const };
     }
     return t;

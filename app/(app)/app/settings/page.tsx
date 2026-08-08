@@ -38,6 +38,7 @@ export default function SettingsPage() {
   );
   const [city, setCity] = useState(w.city);
   const [venue, setVenue] = useState(w.venue);
+  const [styleTags, setStyleTags] = useState(w.styleTags.join(", "));
   const [saving, setSaving] = useState(false);
 
   const [team, setTeam] = useState<TeamState | null>(null);
@@ -65,6 +66,10 @@ export default function SettingsPage() {
         totalBudget: Math.round(Number(totalBudgetReais) * 100),
         city,
         venue,
+        styleTags: styleTags
+          .split(/[,;/|]/)
+          .map((t) => t.trim())
+          .filter(Boolean),
       });
       toast.success("Configurações salvas");
     } catch {
@@ -156,6 +161,17 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <Label>Local</Label>
             <Input value={venue} onChange={(e) => setVenue(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Estilo do casamento</Label>
+            <Input
+              value={styleTags}
+              onChange={(e) => setStyleTags(e.target.value)}
+              placeholder="Ex.: clássico, jardim, boho"
+            />
+            <p className="text-xs text-ink-tertiary">
+              Separe tags por vírgula. Isso conclui a tarefa de definir o estilo.
+            </p>
           </div>
           <Button onClick={save} disabled={saving}>
             {saving ? "Salvando…" : "Salvar"}
