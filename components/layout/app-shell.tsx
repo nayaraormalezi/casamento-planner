@@ -95,7 +95,7 @@ type AppShellProps = {
   children: React.ReactNode;
   weddingName?: string;
   daysRemaining?: number;
-  completionPct?: number;
+  phaseLabel?: string;
   budgetLabel?: string;
   alertCount?: number;
 };
@@ -104,7 +104,7 @@ export function AppShell({
   children,
   weddingName = "Ana & Bruno",
   daysRemaining = 128,
-  completionPct = 34,
+  phaseLabel = "Planejamento inicial",
   budgetLabel = "R$ 82k / 100k",
   alertCount = 2,
 }: AppShellProps) {
@@ -181,7 +181,7 @@ export function AppShell({
               {weddingName}
             </p>
             <p className="truncate text-xs text-ink-tertiary tabular-nums">
-              {daysRemaining} dias · {completionPct}% · {budgetLabel}
+              {daysRemaining} dias · {phaseLabel} · {budgetLabel}
             </p>
           </div>
           <div className="flex items-center gap-1">
