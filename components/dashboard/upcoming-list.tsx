@@ -21,7 +21,7 @@ function Row({
   tone: "overdue" | "soon" | "later";
 }) {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 py-3">
+    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink">{title}</p>
         <p
@@ -35,7 +35,12 @@ function Row({
           {dueLabel}
         </p>
       </div>
-      <Button variant="ghost" size="sm" asChild>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full justify-center sm:w-auto"
+        asChild
+      >
         <Link href={href}>{ctaLabel}</Link>
       </Button>
     </li>
