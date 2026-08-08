@@ -1,12 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ExternalLink, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { PriorityBadge } from "@/components/shared/priority-badge";
-import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,10 +22,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  ChecklistBoard,
+  type ChecklistView,
+} from "@/components/tasks/checklist-board";
 import { useWeddingStore } from "@/lib/demo/store";
 import { composeDashboard, currentPhase } from "@/modules/budget/calculations";
-import { estimateTaskSpend } from "@/modules/tasks/estimates";
-import { moduleForTask, PHASE_LABEL } from "@/modules/tasks/module-links";
+import { resolveJourneyPhase } from "@/modules/dashboard";
+import { groupChecklistTasks } from "@/modules/tasks/checklist";
+import { PHASE_LABEL } from "@/modules/tasks/module-links";
 import type {
   PaymentPlan,
   PaymentStatus,
@@ -117,26 +119,15 @@ export default function TasksPage() {
   const upsert = useWeddingStore((s) => s.upsertTask);
   const remove = useWeddingStore((s) => s.removeTask);
   const dash = composeDashboard(workspace);
-  const [filter, setFilter] = useState<"all" | "phase" | "overdue" | "done">(
-    "phase",
-  );
-  const [phase, setPhase] = useState<TaskPhase>(dash.phase);
+  const journey = resolveJourneyPhase(workspace);
+  const groups = useMemo(() => groupChecklistTasks(workspace), [workspace]);
+  const [view, setView] = useState<ChecklistView>("focus");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Task | null>(null);
 
+  const openCount =
+    groups.now.length + groups.soon.length + groups.later.length;
   const today = new Date().toISOString().slice(0, 10);
-
-  const tasks = useMemo(() => {
-    let list = [...workspace.tasks];
-    if (filter === "phase") list = list.filter((t) => t.phase === phase);
-    if (filter === "overdue")
-      list = list.filter(
-        (t) =>
-          t.status !== "done" && t.dueDate != null && t.dueDate < today,
-      );
-    if (filter === "done") list = list.filter((t) => t.status === "done");
-    return list.sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""));
-  }, [workspace.tasks, filter, phase, today]);
 
   function openNew() {
     setDraft({
@@ -197,16 +188,24 @@ export default function TasksPage() {
   return (
     <div>
       <PageHeader
-        title="Tarefas"
-        description={`Fase atual: ${PHASE_LABEL[dash.phase]} · ${dash.tasks.total - dash.tasks.done} abertas · ${dash.tasks.overdue} atrasadas`}
+        title="Checklist"
+        description={`${journey.currentLabel} · ${openCount} abertas · ${groups.done.length} concluídas`}
         actions={<Button onClick={openNew}>Nova</Button>}
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <p className="mb-4 max-w-2xl text-sm text-ink-secondary">
+        {groups.now.length > 0
+          ? `${groups.now.length} ${groups.now.length === 1 ? "coisa precisa" : "coisas precisam"} da sua atenção agora. O restante pode esperar.`
+          : "Nada urgente no momento. Quando chegar a hora, a gente organiza aqui."}
+      </p>
+
+      <div className="mb-6 flex flex-wrap gap-2">
         {(
           [
-            ["phase", "Fase atual"],
-            ["overdue", "Atrasadas"],
+            ["focus", "Foco"],
+            ["now", "Agora"],
+            ["soon", "Próximas"],
+            ["later", "Depois"],
             ["all", "Todas"],
             ["done", "Concluídas"],
           ] as const
@@ -214,122 +213,30 @@ export default function TasksPage() {
           <Button
             key={key}
             size="sm"
-            variant={filter === key ? "primary" : "secondary"}
-            onClick={() => {
-              setFilter(key);
-              if (key === "phase") setPhase(dash.phase);
-            }}
+            variant={view === key ? "primary" : "secondary"}
+            onClick={() => setView(key)}
           >
             {label}
+            {key === "now" && groups.now.length > 0
+              ? ` (${groups.now.length})`
+              : ""}
           </Button>
         ))}
       </div>
 
-      <div className="mb-6 flex gap-1 overflow-x-auto pb-1">
-        {phases.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => {
-              setPhase(p);
-              setFilter("phase");
-            }}
-            className={cn(
-              "shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium",
-              phase === p && filter === "phase"
-                ? "bg-ink text-ink-inverse"
-                : "bg-canvas-muted text-ink-secondary hover:text-ink",
-            )}
-          >
-            {PHASE_LABEL[p].split(" ")[0]}
-          </button>
-        ))}
-      </div>
-
-      <ul className="space-y-2">
-        {tasks.map((task) => {
-          const overdue =
-            task.status !== "done" &&
-            task.dueDate != null &&
-            task.dueDate < today;
-          const estimate = estimateTaskSpend(task, workspace);
-          const mod = moduleForTask(task);
-          const chosen = task.budgetOptions.find((o) => o.isSelected);
-
-          return (
-            <li
-              key={task.id}
-              className="rounded-lg border border-border bg-canvas-elevated px-4 py-3"
-            >
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 accent-[var(--wp-accent)]"
-                  checked={task.status === "done"}
-                  onChange={() => toggleDone(task)}
-                />
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 text-left"
-                  onClick={() => {
-                    setDraft({
-                      ...task,
-                      budgetOptions: task.budgetOptions ?? [],
-                    });
-                    setOpen(true);
-                  }}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p
-                      className={cn(
-                        "text-sm font-medium",
-                        task.status === "done" &&
-                          "text-ink-tertiary line-through",
-                      )}
-                    >
-                      {task.title}
-                    </p>
-                    <PriorityBadge priority={task.priority} />
-                    <StatusBadge status={task.status} />
-                    {chosen ? (
-                      <StatusBadge status={chosen.paymentStatus} />
-                    ) : null}
-                  </div>
-                  <p className="mt-0.5 text-xs text-ink-tertiary">
-                    {task.dueDate ?? "Sem prazo"}
-                    {overdue ? " · atrasada" : ""}
-                    {" · "}
-                    {mod.label}
-                    {task.budgetOptions.length
-                      ? ` · ${task.budgetOptions.length} orçamento(s)`
-                      : ""}
-                  </p>
-                  {chosen ? (
-                    <p className="mt-1 text-xs tabular-nums text-ink-secondary">
-                      Definido: {chosen.title || "Orçamento"} ·{" "}
-                      {formatMoneyBRL(chosen.amount)}
-                      {chosen.paymentPlan === "installments"
-                        ? " · parcelado"
-                        : " · à vista"}
-                      {" · pago "}
-                      {formatMoneyBRL(chosen.paidAmount)}
-                    </p>
-                  ) : estimate.estimatedCents > 0 ? (
-                    <p className="mt-1 text-xs tabular-nums text-ink-secondary">
-                      Estimativa {formatMoneyBRL(estimate.estimatedCents)}
-                    </p>
-                  ) : null}
-                </button>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={mod.href} aria-label={mod.actionLabel}>
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <ChecklistBoard
+        workspace={workspace}
+        groups={groups}
+        view={view}
+        onToggleDone={toggleDone}
+        onOpenTask={(task) => {
+          setDraft({
+            ...task,
+            budgetOptions: task.budgetOptions ?? [],
+          });
+          setOpen(true);
+        }}
+      />
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="sm:max-w-lg">

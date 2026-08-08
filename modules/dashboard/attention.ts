@@ -62,7 +62,7 @@ function keyFragment(templateKey: string | null): string | null {
   return parts[parts.length - 1] ?? null;
 }
 
-function whyForTask(task: Task, overdue: boolean): string {
+export function whyForTask(task: Task, overdue: boolean): string {
   const frag = keyFragment(task.templateKey);
   if (frag) {
     for (const [key, text] of Object.entries(WHY_BY_KEY)) {
@@ -81,7 +81,7 @@ function whyForTask(task: Task, overdue: boolean): string {
   return "Ajuda o casamento a continuar andando sem acumular pendências.";
 }
 
-function effortForTask(task: Task): string {
+export function effortForTask(task: Task): string {
   const frag = keyFragment(task.templateKey);
   if (frag) {
     for (const [key, label] of Object.entries(EFFORT_BY_KEY)) {
@@ -122,7 +122,7 @@ function scoreTask(task: Task, today: string): number {
   return score;
 }
 
-function urgencyForTask(task: Task, today: string): AttentionUrgency {
+export function urgencyForTask(task: Task, today: string): AttentionUrgency {
   if (task.dueDate && task.dueDate < today) return "now";
   if (task.dueDate) {
     const dueIn = daysUntil(task.dueDate);
