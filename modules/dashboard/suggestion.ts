@@ -7,6 +7,8 @@ export type AssistantTip = {
   body: string;
   href: string;
   ctaLabel: string;
+  /** When true, dashboard shows an apply-allocation control. */
+  applyAllocation?: boolean;
 };
 
 function budgetDefined(ws: WeddingWorkspace): boolean {
@@ -46,9 +48,10 @@ export function assistantTip(ws: WeddingWorkspace): AssistantTip | null {
     return {
       id: "allocate-budget",
       title: "Uma sugestão para você",
-      body: `Antes de contratar fornecedores, defina quanto pretende gastar em cada categoria. Posso ajudar a montar uma distribuição para os seus R$ ${reais}.`,
-      href: "/app/ai",
+      body: `Antes de contratar fornecedores, defina quanto pretende gastar em cada categoria. Posso montar uma sugestão para os seus R$ ${reais}.`,
+      href: "/app/ai?intent=budget_allocation",
       ctaLabel: "Montar distribuição do orçamento",
+      applyAllocation: true,
     };
   }
 

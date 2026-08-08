@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ApplyAllocationButton } from "@/components/budget/apply-allocation";
 import { useWeddingStore } from "@/lib/demo/store";
-import {
-  BUDGET_ALLOCATION_BENCHMARK,
-} from "@/prisma/seed-catalog";
+import { proposeBudgetAllocation } from "@/modules/budget/allocation";
 import {
   composeDashboard,
   suggestCuts,
@@ -27,22 +27,39 @@ type Intent =
   | "budget_allocation";
 
 const intents: { id: Intent; label: string }[] = [
+  { id: "budget_allocation", label: "Distribuir $" },
   { id: "budget_overflow", label: "Estourou orçamento" },
   { id: "what_to_hire", label: "O que contratar" },
   { id: "generate_tasks", label: "Gerar tarefas" },
   { id: "vendor_value", label: "Custo-benefício" },
-  { id: "budget_allocation", label: "Distribuir $" },
 ];
 
-export default function AiPage() {
+function parseIntent(value: string | null): Intent | null {
+  if (!value) return null;
+  return intents.some((i) => i.id === value) ? (value as Intent) : null;
+}
+
+function AiPageInner() {
+  const params = useSearchParams();
   const workspace = useWeddingStore((s) => s.workspace)!;
   const applyBudgetCuts = useWeddingStore((s) => s.applyBudgetCuts);
   const upsertTask = useWeddingStore((s) => s.upsertTask);
   const dash = composeDashboard(workspace);
-  const [intent, setIntent] = useState<Intent>("budget_overflow");
+  const initialIntent = parseIntent(params.get("intent")) ?? "budget_allocation";
+  const [intent, setIntent] = useState<Intent>(initialIntent);
   const [targetReais, setTargetReais] = useState("10000");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [generated, setGenerated] = useState(false);
+  const [generated, setGenerated] = useState(
+    initialIntent === "budget_allocation",
+  );
+
+  useEffect(() => {
+    const fromUrl = parseIntent(params.get("intent"));
+    if (fromUrl) {
+      setIntent(fromUrl);
+      setGenerated(fromUrl === "budget_allocation");
+    }
+  }, [params]);
 
   const overflowCuts = useMemo(
     () => suggestCuts(workspace.budgetItems, Number(targetReais) * 100 || 0),
@@ -71,15 +88,12 @@ export default function AiPage() {
           (v.status === "contracted" ? 0.5 : 0),
       }))
       .sort((a, b) => b.score - a.score);
-  }, [workspace.vendors]);
+  }, [workspace]);
 
-  const allocation = useMemo(() => {
-    return Object.entries(BUDGET_ALLOCATION_BENCHMARK).map(([slug, pct]) => ({
-      name: workspace.categories.find((c) => c.slug === slug)?.name ?? slug,
-      amount: Math.round((dash.totalBudget * pct) / 100),
-      pct,
-    }));
-  }, [workspace.categories, dash.totalBudget]);
+  const allocation = useMemo(
+    () => proposeBudgetAllocation(workspace),
+    [workspace],
+  );
 
   function runGenerate() {
     setGenerated(true);
@@ -109,14 +123,14 @@ export default function AiPage() {
                 ),
               },
         );
-      applyBudgetCuts(updates);
+      void applyBudgetCuts(updates);
       toast.success("Cortes aplicados");
       return;
     }
     if (intent === "generate_tasks") {
       const extras: Task[] = [
         {
-          id: `task_${Math.random().toString(36).slice(2, 8)}`,
+          id: crypto.randomUUID(),
           title: "Revisar lista de músicas da festa",
           description: "Sugestão IA",
           phase: dash.phase,
@@ -133,7 +147,7 @@ export default function AiPage() {
           budgetOptions: [],
         },
         {
-          id: `task_${Math.random().toString(36).slice(2, 8)}`,
+          id: crypto.randomUUID(),
           title: "Agendar prova de menu",
           description: "Sugestão IA",
           phase: dash.phase,
@@ -150,7 +164,7 @@ export default function AiPage() {
           budgetOptions: [],
         },
       ];
-      extras.forEach(upsertTask);
+      extras.forEach((t) => void upsertTask(t));
       toast.success("2 tarefas adicionadas");
     }
   }
@@ -170,7 +184,7 @@ export default function AiPage() {
             variant={intent === i.id ? "primary" : "secondary"}
             onClick={() => {
               setIntent(i.id);
-              setGenerated(false);
+              setGenerated(i.id === "budget_allocation");
             }}
           >
             {i.label}
@@ -189,11 +203,13 @@ export default function AiPage() {
         </div>
       ) : null}
 
-      <Button className="mt-4" onClick={runGenerate}>
-        Gerar sugestão
-      </Button>
+      {intent !== "budget_allocation" ? (
+        <Button className="mt-4" onClick={runGenerate}>
+          Gerar sugestão
+        </Button>
+      ) : null}
 
-      {generated ? (
+      {intent === "budget_allocation" || generated ? (
         <div className="mt-8 rounded-lg border border-border bg-canvas-elevated p-5">
           <p className="text-sm text-ink-tertiary">
             Evidência: comprometido{" "}
@@ -206,7 +222,38 @@ export default function AiPage() {
               : ""}
           </p>
 
-          {intent === "budget_overflow" && (
+          {intent === "budget_allocation" && (
+            <div className="mt-4 space-y-4">
+              <p className="text-sm text-ink-secondary">
+                Distribuição sugerida por categoria (benchmark BR). Revise e
+                aplique — criamos ou ajustamos os itens planejados.
+              </p>
+              <ul className="space-y-2 text-sm">
+                {allocation.lines.map((a) => (
+                  <li key={a.slug} className="flex justify-between gap-4">
+                    <span>
+                      {a.categoryName} ({a.pct}%)
+                      <span className="ml-2 text-xs text-ink-tertiary">
+                        {a.action === "create" && "novo"}
+                        {a.action === "update" && "ajustar"}
+                        {a.action === "skip" && "manter"}
+                      </span>
+                    </span>
+                    <span className="tabular-nums font-medium">
+                      {formatMoneyBRL(a.targetCents)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <ApplyAllocationButton
+                triggerLabel="Aplicar distribuição"
+                triggerVariant="accent"
+                triggerSize="md"
+              />
+            </div>
+          )}
+
+          {intent === "budget_overflow" && generated && (
             <div className="mt-4 space-y-3">
               {overflowCuts.map((c) => (
                 <label key={c.id} className="flex items-start gap-3">
@@ -233,7 +280,7 @@ export default function AiPage() {
             </div>
           )}
 
-          {intent === "what_to_hire" && (
+          {intent === "what_to_hire" && generated && (
             <ul className="mt-4 list-disc space-y-1 pl-5 text-sm">
               {missingHire.length === 0 ? (
                 <li>Categorias essenciais já contratadas.</li>
@@ -243,7 +290,7 @@ export default function AiPage() {
             </ul>
           )}
 
-          {intent === "generate_tasks" && (
+          {intent === "generate_tasks" && generated && (
             <div className="mt-4">
               <p className="text-sm">
                 Sugerimos 2 tarefas para a fase atual ({dash.phase}).
@@ -254,7 +301,7 @@ export default function AiPage() {
             </div>
           )}
 
-          {intent === "vendor_value" && (
+          {intent === "vendor_value" && generated && (
             <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm">
               {vendorRanking.length === 0 ? (
                 <li>Cadastre cotações para comparar.</li>
@@ -268,23 +315,20 @@ export default function AiPage() {
               )}
             </ol>
           )}
-
-          {intent === "budget_allocation" && (
-            <ul className="mt-4 space-y-2 text-sm">
-              {allocation.map((a) => (
-                <li key={a.name} className="flex justify-between gap-4">
-                  <span>
-                    {a.name} ({a.pct}%)
-                  </span>
-                  <span className="tabular-nums font-medium">
-                    {formatMoneyBRL(a.amount)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function AiPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="text-sm text-ink-tertiary">Carregando assistente…</div>
+      }
+    >
+      <AiPageInner />
+    </Suspense>
   );
 }

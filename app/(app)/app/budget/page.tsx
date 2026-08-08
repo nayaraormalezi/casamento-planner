@@ -56,6 +56,7 @@ import {
 } from "recharts";
 import { formatMoneyBRL } from "@/utils/cn";
 import { EditTotalBudget } from "@/components/budget/edit-total-budget";
+import { ApplyAllocationButton } from "@/components/budget/apply-allocation";
 
 function newId() {
   return crypto.randomUUID();
@@ -189,13 +190,20 @@ export default function BudgetPage() {
             />
           </div>
         </div>
-        <EditTotalBudget
-          totalBudgetCents={dash.totalBudget}
-          plannedCents={dash.planned}
-          triggerLabel="Alterar valor total"
-          triggerVariant="primary"
-          triggerSize="md"
-        />
+        <div className="flex flex-wrap gap-2">
+          <EditTotalBudget
+            totalBudgetCents={dash.totalBudget}
+            plannedCents={dash.planned}
+            triggerLabel="Alterar valor total"
+            triggerVariant="primary"
+            triggerSize="md"
+          />
+          <ApplyAllocationButton
+            triggerLabel="Distribuir por categoria"
+            triggerVariant="secondary"
+            triggerSize="md"
+          />
+        </div>
       </section>
 
       <Tabs defaultValue="table">

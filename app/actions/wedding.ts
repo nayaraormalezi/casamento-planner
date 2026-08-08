@@ -190,6 +190,75 @@ export async function applyBudgetCutsAction(
   return { ok: true as const };
 }
 
+export async function applyBudgetAllocationAction() {
+  const ctx = await requireMembership(["owner", "partner"]);
+  const loaded = await loadWorkspaceForUser();
+  const workspace = loaded.workspace;
+  if (!workspace) {
+    return { ok: false as const, error: "NO_WORKSPACE" };
+  }
+  const {
+    allocationWrites,
+    proposeBudgetAllocation,
+  } = await import("@/modules/budget/allocation");
+  const { randomUUID } = await import("crypto");
+
+  if (workspace.wedding.totalBudget <= 0) {
+    return { ok: false as const, error: "NO_TOTAL_BUDGET" };
+  }
+
+  const plan = proposeBudgetAllocation(workspace);
+  const writes = allocationWrites(workspace, plan);
+  if (writes.length === 0) {
+    return {
+      ok: true as const,
+      created: 0,
+      updated: 0,
+      skipped: plan.skipCount,
+      alreadyAllocated: true as const,
+    };
+  }
+
+  // Non-interactive batch — avoids PgBouncer interactive transaction issues.
+  await prisma.$transaction(
+    writes.map((write) =>
+      write.type === "create"
+        ? prisma.budgetItem.create({
+            data: {
+              id: randomUUID(),
+              workspaceId: ctx.workspaceId,
+              weddingId: ctx.weddingId,
+              categoryId: write.item.categoryId,
+              description: write.item.description,
+              plannedAmount: write.item.plannedAmount,
+              contractedAmount: write.item.contractedAmount,
+              paidAmount: write.item.paidAmount,
+              nextPaymentDate: null,
+              vendorId: null,
+              notes: write.item.notes || null,
+              status: write.item.status,
+              priority: write.item.priority,
+              flexibility: write.item.flexibility,
+              emotionalReturn: write.item.emotionalReturn,
+            },
+          })
+        : prisma.budgetItem.updateMany({
+            where: { id: write.id, weddingId: ctx.weddingId },
+            data: { plannedAmount: write.plannedAmount },
+          }),
+    ),
+  );
+
+  revalidatePath("/app");
+  return {
+    ok: true as const,
+    created: writes.filter((w) => w.type === "create").length,
+    updated: writes.filter((w) => w.type === "update").length,
+    skipped: plan.skipCount,
+    alreadyAllocated: false as const,
+  };
+}
+
 export async function upsertTaskAction(task: Task) {
   const ctx = await requireMembership(["owner", "partner", "collaborator"]);
 

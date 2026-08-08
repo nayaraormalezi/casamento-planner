@@ -12,6 +12,7 @@ import type {
   WeddingWorkspace,
 } from "@/types/domain";
 import {
+  applyBudgetAllocationAction,
   applyBudgetCutsAction,
   completeOnboardingAction,
   getSessionAction,
@@ -61,6 +62,14 @@ type WeddingStore = {
       status?: BudgetItem["status"];
     }[],
   ) => Promise<void>;
+  applyBudgetAllocation: () => Promise<{
+    ok: boolean;
+    created?: number;
+    updated?: number;
+    skipped?: number;
+    alreadyAllocated?: boolean;
+    error?: string;
+  }>;
   upsertVendor: (vendor: Vendor) => Promise<void>;
   removeVendor: (id: string) => Promise<void>;
   upsertTask: (task: Task) => Promise<void>;
@@ -163,6 +172,11 @@ export const useWeddingStore = create<WeddingStore>((set, get) => ({
   applyBudgetCuts: async (updates) => {
     await applyBudgetCutsAction(updates);
     await get().refresh();
+  },
+  applyBudgetAllocation: async () => {
+    const res = await applyBudgetAllocationAction();
+    if (res.ok) await get().refresh();
+    return res;
   },
   upsertVendor: async (vendor) => {
     await upsertVendorAction(vendor);
