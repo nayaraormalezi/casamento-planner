@@ -9,3 +9,11 @@
 4. Em **Deployments**, faça **Redeploy**.
 
 Não suba este arquivo no GitHub — ele contém segredos.
+
+## Documentos (Supabase Storage)
+
+No SQL Editor do Supabase, rode `docs/sql/storage-policies.sql` para criar o bucket
+`wedding-documents` (privado, 10 MB). Sem isso, o upload de documentos falha.
+
+Defina `NEXT_PUBLIC_APP_URL` com a URL de produção (ex.: `https://casamento-planner-rho.vercel.app`)
+para que os links de convite saiam corretos.

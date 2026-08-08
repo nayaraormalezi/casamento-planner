@@ -20,7 +20,8 @@ export async function getActiveMembership() {
         },
       },
     },
-    orderBy: { createdAt: "asc" },
+    // Prefer the membership most recently touched (e.g. after accepting an invite).
+    orderBy: { updatedAt: "desc" },
   });
 
   return { user, membership };

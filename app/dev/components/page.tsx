@@ -287,7 +287,11 @@ export default function ComponentsGalleryPage() {
 
       <Section title="Upload & empty">
         <div className="grid gap-6 lg:grid-cols-2">
-          <UploadDropzone onClick={() => toast.message("Upload stub")} />
+          <UploadDropzone
+            onFile={() => {
+              toast.message("Upload stub");
+            }}
+          />
           <EmptyState
             icon={Wallet}
             title="Seu dinheiro precisa de um mapa"

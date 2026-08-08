@@ -183,6 +183,7 @@ export type DocumentItem = {
   id: string;
   name: string;
   type: DocumentType;
+  mimeType: string;
   sizeBytes: number;
   linkedLabel: string;
   createdAt: string;

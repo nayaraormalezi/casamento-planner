@@ -343,6 +343,7 @@ export function buildDemoWorkspace(): WeddingWorkspace {
       id: id("doc"),
       name: "contrato-casa-figueira.pdf",
       type: "contract",
+      mimeType: "application/pdf",
       sizeBytes: 240_000,
       linkedLabel: "Casa Figueira",
       createdAt: today,

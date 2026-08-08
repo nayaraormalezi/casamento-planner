@@ -229,6 +229,7 @@ function mapDocument(d: PDocument): DocumentItem {
     id: d.id,
     name: d.name,
     type: d.type,
+    mimeType: d.mimeType,
     sizeBytes: d.sizeBytes,
     linkedLabel: d.linkedType ?? "",
     createdAt: dateStr(d.createdAt) ?? "",

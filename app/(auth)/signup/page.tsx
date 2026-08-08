@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { useWeddingStore } from "@/lib/demo/store";
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  const next = params.get("next");
   const hydrate = useWeddingStore((s) => s.hydrate);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export default function SignupPage() {
       }
       if (data.session) {
         await hydrate();
-        router.push("/onboarding");
+        router.push(next || "/onboarding");
         router.refresh();
         return;
       }
@@ -109,11 +111,22 @@ export default function SignupPage() {
         </form>
         <p className="mt-6 text-center text-sm text-ink-tertiary">
           Já tem conta?{" "}
-          <Link href="/login" className="text-accent hover:underline">
+          <Link
+            href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+            className="text-accent hover:underline"
+          >
             Entrar
           </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   );
 }
