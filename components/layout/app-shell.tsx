@@ -42,53 +42,47 @@ type NavGroup = {
   items: NavItem[];
 };
 
+/** Primary IA: planning copiloto, wedding ops, extras. Tools stay in topbar/Mais. */
 const navGroups: NavGroup[] = [
   {
-    label: "Operação",
+    label: "Planejamento",
     items: [
       { href: "/app/dashboard", label: "Início", icon: LayoutDashboard },
-      { href: "/app/alerts", label: "Alertas", icon: Bell },
-      { href: "/app/ai", label: "Assistente", icon: Sparkles },
-    ],
-  },
-  {
-    label: "Planejar",
-    items: [
-      { href: "/app/tasks", label: "Tarefas", icon: CheckSquare },
+      { href: "/app/tasks", label: "Checklist", icon: CheckSquare },
       { href: "/app/schedule", label: "Cronograma", icon: CalendarRange },
-      { href: "/app/decisions", label: "Decisões", icon: Scale },
     ],
   },
   {
-    label: "Dinheiro",
+    label: "Casamento",
     items: [
       { href: "/app/budget", label: "Orçamento", icon: Wallet },
-      { href: "/app/priority", label: "Prioridades", icon: Target },
-      { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Pessoas",
-    items: [
       { href: "/app/vendors", label: "Fornecedores", icon: Truck },
       { href: "/app/guests", label: "Convidados", icon: Users },
-      { href: "/app/gifts", label: "Presentes", icon: Gift },
     ],
   },
   {
-    label: "Extra",
+    label: "Extras",
     items: [
-      { href: "/app/honeymoon", label: "Lua de mel", icon: Plane },
+      { href: "/app/decisions", label: "Decisões", icon: Scale },
       { href: "/app/documents", label: "Documentos", icon: FileText },
+      { href: "/app/honeymoon", label: "Lua de mel", icon: Plane },
+      { href: "/app/gifts", label: "Presentes", icon: Gift },
     ],
   },
 ];
 
 const mobileTabs: NavItem[] = [
   { href: "/app/dashboard", label: "Início", icon: LayoutDashboard },
-  { href: "/app/tasks", label: "Tarefas", icon: CheckSquare },
+  { href: "/app/tasks", label: "Checklist", icon: CheckSquare },
   { href: "/app/budget", label: "Orçamento", icon: Wallet },
+  { href: "/app/guests", label: "Convidados", icon: Users },
+];
+
+const moreTools: NavItem[] = [
   { href: "/app/alerts", label: "Alertas", icon: Bell },
+  { href: "/app/ai", label: "Assistente", icon: Sparkles },
+  { href: "/app/priority", label: "Prioridades", icon: Target },
+  { href: "/app/analytics", label: "Relatórios", icon: BarChart3 },
 ];
 
 type AppShellProps = {
@@ -185,9 +179,12 @@ export function AppShell({
             </p>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-sm" asChild>
+            <Button variant="ghost" size="icon-sm" asChild className="relative">
               <Link href="/app/alerts" aria-label="Alertas">
                 <Bell className="h-4 w-4" />
+                {alertCount > 0 ? (
+                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-danger" />
+                ) : null}
               </Link>
             </Button>
             <Button variant="ghost" size="icon-sm" asChild>
@@ -209,9 +206,6 @@ export function AppShell({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
                   <Link href="/app/settings">Configurações</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/app/settings/team">Equipe</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -269,6 +263,12 @@ export function AppShell({
                     <Link href={item.href}>{item.label}</Link>
                   </DropdownMenuItem>
                 ))}
+              <DropdownMenuSeparator />
+              {moreTools.map((item) => (
+                <DropdownMenuItem key={item.href} asChild>
+                  <Link href={item.href}>{item.label}</Link>
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href="/app/settings">Configurações</Link>

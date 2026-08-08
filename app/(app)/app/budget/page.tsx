@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
@@ -128,8 +129,18 @@ export default function BudgetPage() {
     <div>
       <PageHeader
         title="Orçamento"
-        description={`Comprometido ${formatMoneyBRL(dash.committed)} de ${formatMoneyBRL(dash.totalBudget)} · ${dash.freeBudget >= 0 ? "livre" : "estouro"} ${formatMoneyBRL(Math.abs(dash.freeBudget))}`}
-        actions={<Button onClick={openNew}>Novo item</Button>}
+        description={`Planejado ${formatMoneyBRL(dash.planned)} de ${formatMoneyBRL(dash.totalBudget)} · disponível ${formatMoneyBRL(Math.max(dash.totalBudget - dash.planned, 0))}`}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" asChild>
+              <Link href="/app/priority">Prioridades</Link>
+            </Button>
+            <Button variant="secondary" size="sm" asChild>
+              <Link href="/app/analytics">Relatórios</Link>
+            </Button>
+            <Button onClick={openNew}>Novo item</Button>
+          </div>
+        }
       />
 
       <Tabs defaultValue="table">
