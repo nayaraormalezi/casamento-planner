@@ -199,29 +199,32 @@ export default function TasksPage() {
           : "Nada urgente no momento. Quando chegar a hora, a gente organiza aqui."}
       </p>
 
-      <div className="mb-6 flex flex-wrap gap-2">
-        {(
-          [
-            ["focus", "Foco"],
-            ["now", "Agora"],
-            ["soon", "Próximas"],
-            ["later", "Depois"],
-            ["all", "Todas"],
-            ["done", "Concluídas"],
-          ] as const
-        ).map(([key, label]) => (
-          <Button
-            key={key}
-            size="sm"
-            variant={view === key ? "primary" : "secondary"}
-            onClick={() => setView(key)}
-          >
-            {label}
-            {key === "now" && groups.now.length > 0
-              ? ` (${groups.now.length})`
-              : ""}
-          </Button>
-        ))}
+      <div className="sticky top-[var(--wp-topbar-height)] z-[calc(var(--wp-z-sticky)-1)] -mx-3 mb-5 border-b border-border/70 bg-canvas/95 px-3 py-2 backdrop-blur-sm sm:static sm:mx-0 sm:mb-6 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+        <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {(
+            [
+              ["focus", "Foco"],
+              ["now", "Agora"],
+              ["soon", "Próximas"],
+              ["later", "Depois"],
+              ["all", "Todas"],
+              ["done", "Concluídas"],
+            ] as const
+          ).map(([key, label]) => (
+            <Button
+              key={key}
+              size="sm"
+              variant={view === key ? "primary" : "secondary"}
+              className="shrink-0"
+              onClick={() => setView(key)}
+            >
+              {label}
+              {key === "now" && groups.now.length > 0
+                ? ` (${groups.now.length})`
+                : ""}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <ChecklistBoard

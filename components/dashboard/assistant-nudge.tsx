@@ -19,20 +19,21 @@ export function AssistantNudge({ tip }: AssistantNudgeProps) {
         {tip.title}
       </h2>
       <p className="mt-2 max-w-2xl text-sm text-ink-secondary">{tip.body}</p>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         {tip.applyAllocation ? (
           <ApplyAllocationButton
             triggerLabel={tip.ctaLabel}
             triggerVariant="primary"
             triggerSize="sm"
+            className="w-full sm:w-auto"
           />
         ) : (
-          <Button size="sm" asChild>
+          <Button size="sm" className="w-full sm:w-auto" asChild>
             <Link href={tip.href}>{tip.ctaLabel}</Link>
           </Button>
         )}
         {tip.applyAllocation ? (
-          <Button size="sm" variant="ghost" asChild>
+          <Button size="sm" variant="ghost" className="w-full sm:w-auto" asChild>
             <Link href={tip.href}>Ver no assistente</Link>
           </Button>
         ) : null}

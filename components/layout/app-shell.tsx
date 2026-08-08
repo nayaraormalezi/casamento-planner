@@ -26,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -71,11 +72,12 @@ const navGroups: NavGroup[] = [
   },
 ];
 
+/** Mobile: Planejamento + Casamento primaries. */
 const mobileTabs: NavItem[] = [
   { href: "/app/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/app/tasks", label: "Checklist", icon: CheckSquare },
   { href: "/app/budget", label: "Orçamento", icon: Wallet },
-  { href: "/app/guests", label: "Convidados", icon: Users },
+  { href: "/app/vendors", label: "Fornecedores", icon: Truck },
 ];
 
 const moreTools: NavItem[] = [
@@ -105,6 +107,16 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const logout = useWeddingStore((s) => s.logout);
+
+  const moreHrefs = new Set([
+    ...navGroups
+      .flatMap((g) => g.items)
+      .filter((i) => !mobileTabs.some((t) => t.href === i.href))
+      .map((i) => i.href),
+    ...moreTools.map((i) => i.href),
+    "/app/settings",
+  ]);
+  const moreActive = [...moreHrefs].some((href) => pathname.startsWith(href));
 
   return (
     <div className="flex min-h-dvh">
@@ -140,11 +152,6 @@ export function AppShell({
                       >
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                         {item.label}
-                        {item.href === "/app/alerts" && alertCount > 0 ? (
-                          <span className="ml-auto rounded-sm bg-danger-subtle px-1.5 text-[11px] font-medium text-danger">
-                            {alertCount}
-                          </span>
-                        ) : null}
                       </Link>
                     </li>
                   );
@@ -169,16 +176,19 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-[var(--wp-z-sticky)] flex h-[var(--wp-topbar-height)] items-center justify-between gap-4 border-b border-border bg-canvas-elevated/90 px-4 backdrop-blur-sm sm:px-6">
+        <header className="sticky top-0 z-[var(--wp-z-sticky)] flex h-[var(--wp-topbar-height)] items-center justify-between gap-3 border-b border-border bg-canvas-elevated/90 px-3 backdrop-blur-sm sm:gap-4 sm:px-6">
           <div className="min-w-0">
             <p className="truncate font-display text-sm font-semibold text-ink sm:text-base">
               {weddingName}
             </p>
             <p className="truncate text-xs text-ink-tertiary tabular-nums">
-              {daysRemaining} dias · {phaseLabel} · {budgetLabel}
+              <span>
+                {daysRemaining} dias · {phaseLabel}
+              </span>
+              <span className="hidden sm:inline"> · {budgetLabel}</span>
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
             <Button variant="ghost" size="icon-sm" asChild className="relative">
               <Link href="/app/alerts" aria-label="Alertas">
                 <Bell className="h-4 w-4" />
@@ -197,7 +207,7 @@ export function AppShell({
                 <Button
                   variant="secondary"
                   size="icon-sm"
-                  className="ml-1 rounded-full"
+                  className="ml-0.5 rounded-full sm:ml-1"
                   aria-label="Menu da conta"
                 >
                   <span className="text-xs font-semibold">A</span>
@@ -222,11 +232,14 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[var(--wp-content-max)] flex-1 px-4 py-6 pb-24 sm:px-6 sm:py-8 lg:pb-8 animate-[fade-rise_var(--wp-duration-normal)_var(--wp-ease-out)]">
+        <main className="mx-auto w-full max-w-[var(--wp-content-max)] flex-1 px-3 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8 lg:pb-8 animate-[fade-rise_var(--wp-duration-normal)_var(--wp-ease-out)]">
           {children}
         </main>
 
-        <nav className="fixed inset-x-0 bottom-0 z-[var(--wp-z-sticky)] flex border-t border-border bg-canvas-elevated/95 backdrop-blur-sm lg:hidden">
+        <nav
+          className="fixed inset-x-0 bottom-0 z-[var(--wp-z-sticky)] flex border-t border-border bg-canvas-elevated/95 backdrop-blur-sm lg:hidden"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
           {mobileTabs.map((item) => {
             const active = pathname.startsWith(item.href);
             const Icon = item.icon;
@@ -235,12 +248,12 @@ export function AppShell({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px]",
-                  active ? "text-ink" : "text-ink-tertiary",
+                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] leading-tight",
+                  active ? "font-medium text-ink" : "text-ink-tertiary",
                 )}
               >
-                <Icon className="h-5 w-5" strokeWidth={1.75} />
-                {item.label}
+                <Icon className="h-5 w-5" strokeWidth={active ? 2 : 1.75} />
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -248,25 +261,53 @@ export function AppShell({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] text-ink-tertiary"
+                className={cn(
+                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] leading-tight",
+                  moreActive ? "font-medium text-ink" : "text-ink-tertiary",
+                )}
               >
-                <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
+                <MoreHorizontal
+                  className="h-5 w-5"
+                  strokeWidth={moreActive ? 2 : 1.75}
+                />
                 Mais
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="end" className="mb-2 w-48">
-              {navGroups
-                .flatMap((g) => g.items)
-                .filter((i) => !mobileTabs.some((t) => t.href === i.href))
-                .map((item) => (
-                  <DropdownMenuItem key={item.href} asChild>
-                    <Link href={item.href}>{item.label}</Link>
-                  </DropdownMenuItem>
-                ))}
+            <DropdownMenuContent
+              side="top"
+              align="end"
+              className="mb-2 max-h-[70vh] w-56 overflow-y-auto"
+            >
+              {navGroups.map((group) => {
+                const extras = group.items.filter(
+                  (i) => !mobileTabs.some((t) => t.href === i.href),
+                );
+                if (extras.length === 0) return null;
+                return (
+                  <div key={group.label}>
+                    <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-ink-disabled">
+                      {group.label}
+                    </DropdownMenuLabel>
+                    {extras.map((item) => (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link href={item.href}>{item.label}</Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                );
+              })}
               <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-ink-disabled">
+                Ferramentas
+              </DropdownMenuLabel>
               {moreTools.map((item) => (
                 <DropdownMenuItem key={item.href} asChild>
-                  <Link href={item.href}>{item.label}</Link>
+                  <Link href={item.href}>
+                    {item.label}
+                    {item.href === "/app/alerts" && alertCount > 0
+                      ? ` (${alertCount})`
+                      : ""}
+                  </Link>
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />

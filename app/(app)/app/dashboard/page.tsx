@@ -48,14 +48,14 @@ export default function DashboardPage() {
       : workspace.wedding.name;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <header className="max-w-2xl">
-        <p className="text-sm text-ink-tertiary">{couple}</p>
-        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+        <p className="text-xs text-ink-tertiary sm:text-sm">{couple}</p>
+        <h1 className="mt-1 font-display text-xl font-semibold tracking-tight text-ink sm:text-3xl">
           {greetingForNow()}
           {name ? `, ${name}` : ""}
         </h1>
-        <p className="mt-2 text-base text-ink-secondary">
+        <p className="mt-2 text-sm text-ink-secondary sm:text-base">
           Seu casamento está a{" "}
           <span className="font-medium tabular-nums text-ink">
             {dash.daysRemaining} dias
@@ -67,7 +67,7 @@ export default function DashboardPage() {
 
       <AttentionList items={attention} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
         <BudgetSnapshot
           planned={dash.planned}
           totalBudget={dash.totalBudget}

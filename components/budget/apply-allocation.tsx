@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useWeddingStore } from "@/lib/demo/store";
 import { proposeBudgetAllocation } from "@/modules/budget/allocation";
-import { formatMoneyBRL } from "@/utils/cn";
+import { cn, formatMoneyBRL } from "@/utils/cn";
 
 type ApplyAllocationProps = {
   triggerLabel?: string;
@@ -76,7 +76,7 @@ export function ApplyAllocationButton({
         type="button"
         variant={triggerVariant}
         size={triggerSize}
-        className={className}
+        className={cn(className)}
         onClick={() => setOpen(true)}
       >
         {triggerLabel}

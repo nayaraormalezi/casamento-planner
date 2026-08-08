@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { estimateTaskSpend } from "@/modules/tasks/estimates";
@@ -46,62 +45,77 @@ function TaskRow({
         : "text-ink-tertiary";
 
   return (
-    <li className="rounded-lg border border-border bg-canvas-elevated px-4 py-3">
+    <li className="rounded-lg border border-border bg-canvas-elevated px-3 py-3 sm:px-4">
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
-          className="mt-1 h-4 w-4 accent-[var(--wp-accent)]"
+          className="mt-1 h-5 w-5 shrink-0 accent-[var(--wp-accent)] sm:h-4 sm:w-4"
           checked={task.status === "done"}
           onChange={() => onToggleDone(task)}
           aria-label={`Concluir ${task.title}`}
         />
-        <button
-          type="button"
-          className="min-w-0 flex-1 text-left"
-          onClick={() => onOpenTask(task)}
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p
-              className={cn(
-                "text-sm font-medium text-ink",
-                task.status === "done" && "text-ink-tertiary line-through",
-              )}
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            className="w-full text-left"
+            onClick={() => onOpenTask(task)}
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+              <p
+                className={cn(
+                  "text-sm font-medium text-ink",
+                  task.status === "done" && "text-ink-tertiary line-through",
+                )}
+              >
+                {task.title}
+              </p>
+              <p className="text-xs tabular-nums text-ink-tertiary">
+                {item.effortLabel}
+              </p>
+            </div>
+            {task.status !== "done" ? (
+              <p className="mt-1 line-clamp-2 text-sm text-ink-secondary sm:line-clamp-none">
+                {item.why}
+              </p>
+            ) : null}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <span className={tone}>{item.dueLabel}</span>
+              <span className="text-ink-tertiary">{item.moduleLabel}</span>
+              {task.status === "doing" ? (
+                <StatusBadge status="doing" />
+              ) : null}
+              {chosen ? (
+                <span className="tabular-nums text-ink-secondary">
+                  {formatMoneyBRL(chosen.amount)} definidos
+                </span>
+              ) : estimate.estimatedCents > 0 ? (
+                <span className="hidden tabular-nums text-ink-tertiary sm:inline">
+                  ~{formatMoneyBRL(estimate.estimatedCents)}
+                </span>
+              ) : null}
+            </div>
+          </button>
+          <div className="mt-3 flex gap-2 sm:mt-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="flex-1 sm:hidden"
+              onClick={() => onOpenTask(task)}
             >
-              {task.title}
-            </p>
-            <p className="text-xs tabular-nums text-ink-tertiary">
-              {item.effortLabel}
-            </p>
+              Detalhes
+            </Button>
+            <Button size="sm" className="flex-1 sm:hidden" asChild>
+              <Link href={item.href}>{item.ctaLabel}</Link>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="hidden sm:inline-flex"
+              asChild
+            >
+              <Link href={item.href}>{item.ctaLabel}</Link>
+            </Button>
           </div>
-          {task.status !== "done" ? (
-            <p className="mt-1 text-sm text-ink-secondary">{item.why}</p>
-          ) : null}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <span className={tone}>{item.dueLabel}</span>
-            <span className="text-ink-tertiary">{item.moduleLabel}</span>
-            {task.status === "doing" ? (
-              <StatusBadge status="doing" />
-            ) : null}
-            {chosen ? (
-              <span className="tabular-nums text-ink-secondary">
-                {formatMoneyBRL(chosen.amount)} definidos
-              </span>
-            ) : estimate.estimatedCents > 0 ? (
-              <span className="tabular-nums text-ink-tertiary">
-                ~{formatMoneyBRL(estimate.estimatedCents)}
-              </span>
-            ) : null}
-          </div>
-        </button>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={item.href} aria-label={item.ctaLabel}>
-              <ExternalLink className="h-4 w-4" />
-            </Link>
-          </Button>
-          <span className="max-w-[5.5rem] text-right text-[11px] font-medium text-accent">
-            {item.ctaLabel}
-          </span>
         </div>
       </div>
     </li>
@@ -126,7 +140,7 @@ function Section({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="font-display text-lg font-semibold text-ink">
+        <h2 className="font-display text-base font-semibold text-ink sm:text-lg">
           {copy.title}
         </h2>
         <p className="mt-0.5 text-sm text-ink-tertiary">{copy.subtitle}</p>
@@ -157,7 +171,7 @@ export function ChecklistBoard({
     return (
       <section className="space-y-3">
         <div>
-          <h2 className="font-display text-lg font-semibold text-ink">
+          <h2 className="font-display text-base font-semibold text-ink sm:text-lg">
             Já concluídas
           </h2>
           <p className="mt-0.5 text-sm text-ink-tertiary">
@@ -190,7 +204,7 @@ export function ChecklistBoard({
     return (
       <section className="space-y-3">
         <div>
-          <h2 className="font-display text-lg font-semibold text-ink">
+          <h2 className="font-display text-base font-semibold text-ink sm:text-lg">
             Todas as abertas
           </h2>
           <p className="mt-0.5 text-sm text-ink-tertiary">
@@ -222,7 +236,7 @@ export function ChecklistBoard({
     groups.now.length + groups.soon.length + groups.later.length;
   if (openCount === 0) {
     return (
-      <p className="rounded-lg border border-border bg-canvas-elevated p-6 text-sm text-ink-secondary">
+      <p className="rounded-lg border border-border bg-canvas-elevated p-5 text-sm text-ink-secondary sm:p-6">
         Checklist em dia. Quando surgir algo novo, organizamos por prioridade
         aqui.
       </p>
@@ -241,9 +255,8 @@ export function ChecklistBoard({
     );
   }
 
-  // focus — full copiloto board
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 sm:space-y-10">
       <Section
         bucket="now"
         items={groups.now}

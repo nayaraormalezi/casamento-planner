@@ -48,12 +48,15 @@ export function JourneySnapshotCard({
         ) : null}
       </div>
 
-      <ol className="mt-5 flex flex-wrap gap-2" aria-label="Jornada do casamento">
+      <ol
+        className="mt-5 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
+        aria-label="Jornada do casamento"
+      >
         {journey.phases.map((phase) => (
           <li
             key={phase.id}
             className={cn(
-              "rounded-md px-2 py-1 text-xs",
+              "shrink-0 rounded-md px-2 py-1 text-xs",
               phase.status === "done" &&
                 "bg-success-subtle text-success",
               phase.status === "current" &&
@@ -68,8 +71,16 @@ export function JourneySnapshotCard({
 
       {progress.wins.length > 0 ? (
         <ul className="mt-5 space-y-1.5 text-sm text-ink-secondary">
+          {progress.wins.slice(0, 2).map((win) => (
+            <li key={win} className="flex gap-2 sm:hidden">
+              <span className="text-accent" aria-hidden>
+                ✓
+              </span>
+              <span>{win}</span>
+            </li>
+          ))}
           {progress.wins.map((win) => (
-            <li key={win} className="flex gap-2">
+            <li key={`d-${win}`} className="hidden gap-2 sm:flex">
               <span className="text-accent" aria-hidden>
                 ✓
               </span>
