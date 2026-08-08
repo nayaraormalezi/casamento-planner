@@ -55,9 +55,10 @@ import {
   YAxis,
 } from "recharts";
 import { formatMoneyBRL } from "@/utils/cn";
+import { EditTotalBudget } from "@/components/budget/edit-total-budget";
 
 function newId() {
-  return `bi_${Math.random().toString(36).slice(2, 10)}`;
+  return crypto.randomUUID();
 }
 
 const emptyItem = (categoryId: string): BudgetItem => ({
@@ -132,6 +133,10 @@ export default function BudgetPage() {
         description={`Planejado ${formatMoneyBRL(dash.planned)} de ${formatMoneyBRL(dash.totalBudget)} · disponível ${formatMoneyBRL(Math.max(dash.totalBudget - dash.planned, 0))}`}
         actions={
           <div className="flex flex-wrap gap-2">
+            <EditTotalBudget
+              totalBudgetCents={dash.totalBudget}
+              plannedCents={dash.planned}
+            />
             <Button variant="secondary" size="sm" asChild>
               <Link href="/app/priority">Prioridades</Link>
             </Button>
@@ -142,6 +147,56 @@ export default function BudgetPage() {
           </div>
         }
       />
+
+      <section className="mb-6 grid gap-3 rounded-lg border border-border bg-canvas-elevated p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-disabled">
+            Orçamento total
+          </p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink">
+            {formatMoneyBRL(dash.totalBudget)}
+          </p>
+          <p className="mt-1 text-sm text-ink-tertiary">
+            Planejado {formatMoneyBRL(dash.planned)} · disponível{" "}
+            {formatMoneyBRL(Math.max(dash.totalBudget - dash.planned, 0))}
+          </p>
+          <div
+            className="mt-3 h-2 max-w-md overflow-hidden rounded-full bg-canvas-muted"
+            role="progressbar"
+            aria-valuenow={
+              dash.totalBudget <= 0
+                ? 0
+                : Math.min(
+                    100,
+                    Math.round((dash.planned / dash.totalBudget) * 100),
+                  )
+            }
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              className="h-full rounded-full bg-accent"
+              style={{
+                width: `${
+                  dash.totalBudget <= 0
+                    ? 0
+                    : Math.min(
+                        100,
+                        Math.round((dash.planned / dash.totalBudget) * 100),
+                      )
+                }%`,
+              }}
+            />
+          </div>
+        </div>
+        <EditTotalBudget
+          totalBudgetCents={dash.totalBudget}
+          plannedCents={dash.planned}
+          triggerLabel="Alterar valor total"
+          triggerVariant="primary"
+          triggerSize="md"
+        />
+      </section>
 
       <Tabs defaultValue="table">
         <TabsList>

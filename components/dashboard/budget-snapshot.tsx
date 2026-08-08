@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { EditTotalBudget } from "@/components/budget/edit-total-budget";
 import { formatCompactMoneyBRL, formatMoneyBRL } from "@/utils/cn";
 
 type BudgetSnapshotProps = {
@@ -72,10 +73,15 @@ export function BudgetSnapshot({
           </dd>
         </div>
       </dl>
-      <div className="mt-auto pt-5">
+      <div className="mt-auto flex flex-wrap gap-2 pt-5">
         <Button variant="secondary" size="sm" asChild>
           <Link href="/app/budget">Ver orçamento</Link>
         </Button>
+        <EditTotalBudget
+          totalBudgetCents={totalBudget}
+          plannedCents={planned}
+          triggerLabel="Editar teto"
+        />
       </div>
     </section>
   );
