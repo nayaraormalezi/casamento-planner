@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { prismaDirect } from "@/lib/prisma-direct";
 import { missingCatalogTasks } from "@/modules/tasks/ensure-catalog";
 import {
   featurePatchFromTask,
@@ -8,9 +9,38 @@ import {
 import { loadWorkspaceForUser } from "@/modules/wedding/load-workspace";
 import type { Task } from "@/types/domain";
 
-function dateStr(d: Date | null | undefined): string | null {
-  if (!d) return null;
-  return d.toISOString().slice(0, 10);
+function dateOnly(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const slice = value.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(slice) ? slice : null;
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+function initialStatusForTemplate(
+  templateKey: string,
+  wedding: {
+    totalBudget: number;
+    weddingDate: string | null;
+    venue: string | null;
+    styleTags: string[];
+  },
+): "todo" | "done" {
+  if (templateKey.includes("set_budget") && wedding.totalBudget > 0) {
+    return "done";
+  }
+  if (templateKey.includes("set_date") && wedding.weddingDate) return "done";
+  if (templateKey.includes("set_style") && wedding.styleTags.length > 0) {
+    return "done";
+  }
+  if (templateKey.includes("lock_venue") && wedding.venue?.trim()) {
+    return "done";
+  }
+  return "todo";
 }
 
 /** Insert any missing default checklist tasks for the current wedding. */
@@ -18,74 +48,88 @@ export async function ensureWeddingTaskCatalog(input: {
   workspaceId: string;
   weddingId: string;
 }): Promise<number> {
-  const [wedding, tasks, budgetItems, categories] = await Promise.all([
-    prisma.wedding.findUnique({ where: { id: input.weddingId } }),
-    prisma.task.findMany({
+  const db = prismaDirect;
+  const [wedding, tasks] = await Promise.all([
+    db.wedding.findUnique({ where: { id: input.weddingId } }),
+    db.task.findMany({
       where: { weddingId: input.weddingId, deletedAt: null },
       select: { templateKey: true },
-    }),
-    prisma.budgetItem.findMany({
-      where: { weddingId: input.weddingId, deletedAt: null },
-      select: { id: true, categoryId: true },
-    }),
-    prisma.budgetCategory.findMany({
-      where: { weddingId: input.weddingId },
-      select: { id: true, slug: true },
     }),
   ]);
 
   if (!wedding) return 0;
 
-  const slugByCategoryId = Object.fromEntries(
-    categories.map((c) => [c.id, c.slug]),
-  );
-  const budgetItemIdBySlug: Record<string, string> = {};
-  for (const item of budgetItems) {
-    const slug = slugByCategoryId[item.categoryId];
-    if (slug && !budgetItemIdBySlug[slug]) budgetItemIdBySlug[slug] = item.id;
-  }
-
   const existing = new Set(
     tasks.map((t) => t.templateKey).filter(Boolean) as string[],
   );
+  const weddingDate = dateOnly(wedding.weddingDate);
   const missing = missingCatalogTasks({
-    weddingDate: dateStr(wedding.weddingDate),
+    weddingDate,
     existingTemplateKeys: existing,
-    budgetItemIdBySlug,
+    budgetItemIdBySlug: {},
   });
 
   if (missing.length === 0) return 0;
 
-  await prisma.task.createMany({
-    data: missing.map((t) => ({
-      id: t.id,
-      workspaceId: input.workspaceId,
-      weddingId: input.weddingId,
-      title: t.title,
-      description: t.description,
-      phase: t.phase,
-      categorySlug: t.categorySlug,
-      priority: t.priority,
-      dueDate: t.dueDate,
-      status: "todo",
-      isMilestone: t.isMilestone,
-      templateKey: t.templateKey,
-      budgetItemId: t.budgetItemId,
-      sortOrder: t.sortOrder,
-    })),
-  });
+  const rows = missing.map((t) => ({
+    id: t.id,
+    workspaceId: input.workspaceId,
+    weddingId: input.weddingId,
+    title: t.title,
+    description: t.description,
+    phase: t.phase,
+    categorySlug: t.categorySlug,
+    priority: t.priority,
+    dueDate: t.dueDate,
+    status: initialStatusForTemplate(t.templateKey, {
+      totalBudget: wedding.totalBudget,
+      weddingDate,
+      venue: wedding.venue,
+      styleTags: wedding.styleTags ?? [],
+    }),
+    isMilestone: t.isMilestone,
+    templateKey: t.templateKey,
+    budgetItemId: null as string | null,
+    sortOrder: t.sortOrder,
+  }));
 
-  return missing.length;
+  const chunkSize = 25;
+  try {
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      await db.task.createMany({ data: rows.slice(i, i + chunkSize) });
+    }
+  } catch (err) {
+    console.error("createMany via prismaDirect failed, falling back", err);
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      try {
+        await prisma.task.createMany({ data: rows.slice(i, i + chunkSize) });
+      } catch (chunkErr) {
+        console.error("chunk createMany failed, inserting one-by-one", chunkErr);
+        for (const row of rows.slice(i, i + chunkSize)) {
+          await prisma.task.create({ data: row }).catch((rowErr) => {
+            console.error("task create failed", row.templateKey, rowErr);
+          });
+        }
+      }
+    }
+  }
+
+  return rows.length;
 }
 
 /** Complete open tasks whose linked features are already filled. */
-export async function syncTasksFromFeatures(): Promise<number> {
+export async function syncTasksFromFeatures(
+  weddingId?: string,
+): Promise<number> {
   const { workspace } = await loadWorkspaceForUser();
   if (!workspace) return 0;
   const ids = taskIdsToAutoComplete(workspace);
   if (ids.length === 0) return 0;
   await prisma.task.updateMany({
-    where: { id: { in: ids } },
+    where: {
+      id: { in: ids },
+      ...(weddingId ? { weddingId } : {}),
+    },
     data: { status: "done" },
   });
   return ids.length;
@@ -201,7 +245,8 @@ export async function syncFeaturesFromTask(
           workspaceId: ctx.workspaceId,
           weddingId: ctx.weddingId,
           categoryId: category.id,
-          description: patch.budgetItem.description ?? patch.budgetItem.categorySlug,
+          description:
+            patch.budgetItem.description ?? patch.budgetItem.categorySlug,
           plannedAmount: patch.budgetItem.plannedAmount,
           contractedAmount: patch.budgetItem.contractedAmount ?? null,
           vendorId: patch.budgetItem.vendorId ?? null,
@@ -216,7 +261,13 @@ export async function syncFeaturesFromTask(
 export async function ensureCatalogAndSyncFeatures(input: {
   workspaceId: string;
   weddingId: string;
-}): Promise<void> {
-  await ensureWeddingTaskCatalog(input);
-  await syncTasksFromFeatures();
+}): Promise<{ added: number; synced: number }> {
+  const added = await ensureWeddingTaskCatalog(input);
+  let synced = 0;
+  try {
+    synced = await syncTasksFromFeatures(input.weddingId);
+  } catch (err) {
+    console.error("syncTasksFromFeatures failed", err);
+  }
+  return { added, synced };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
@@ -26,6 +26,7 @@ import {
   ChecklistBoard,
   type ChecklistView,
 } from "@/components/tasks/checklist-board";
+import { ensureChecklistCatalogAction } from "@/app/actions/wedding";
 import { useWeddingStore } from "@/lib/demo/store";
 import { composeDashboard, currentPhase } from "@/modules/budget/calculations";
 import { resolveJourneyPhase } from "@/modules/dashboard";
@@ -118,16 +119,45 @@ export default function TasksPage() {
   const workspace = useWeddingStore((s) => s.workspace)!;
   const upsert = useWeddingStore((s) => s.upsertTask);
   const remove = useWeddingStore((s) => s.removeTask);
+  const refresh = useWeddingStore((s) => s.refresh);
   const dash = composeDashboard(workspace);
   const journey = resolveJourneyPhase(workspace);
   const groups = useMemo(() => groupChecklistTasks(workspace), [workspace]);
   const [view, setView] = useState<ChecklistView>("focus");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Task | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
+  const ensuredRef = useRef(false);
 
   const openCount =
     groups.now.length + groups.soon.length + groups.later.length;
   const today = new Date().toISOString().slice(0, 10);
+
+  // Existing accounts may predate the full catalog — backfill on open.
+  useEffect(() => {
+    if (ensuredRef.current) return;
+    ensuredRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      setBackfilling(true);
+      try {
+        const res = await ensureChecklistCatalogAction();
+        if (!cancelled && res.ok && res.added > 0) {
+          await refresh();
+          toast.success(
+            `Checklist atualizado com ${res.added} ${res.added === 1 ? "tarefa" : "tarefas"}.`,
+          );
+        }
+      } catch {
+        // non-blocking
+      } finally {
+        if (!cancelled) setBackfilling(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refresh]);
 
   function openNew() {
     setDraft({
@@ -227,6 +257,12 @@ export default function TasksPage() {
           ))}
         </div>
       </div>
+
+      {backfilling && openCount === 0 && groups.done.length === 0 ? (
+        <p className="mb-4 text-sm text-ink-tertiary">
+          Preparando seu checklist completo…
+        </p>
+      ) : null}
 
       <ChecklistBoard
         workspace={workspace}

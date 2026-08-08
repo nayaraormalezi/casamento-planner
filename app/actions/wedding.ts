@@ -40,15 +40,21 @@ export async function getWorkspaceAction(): Promise<{
   try {
     const loaded = await loadWorkspaceForUser();
     if (loaded.workspace && loaded.workspaceId && loaded.weddingId) {
-      const { ensureCatalogAndSyncFeatures } = await import(
-        "@/modules/tasks/sync-server"
-      );
-      await ensureCatalogAndSyncFeatures({
-        workspaceId: loaded.workspaceId,
-        weddingId: loaded.weddingId,
-      });
-      const refreshed = await loadWorkspaceForUser();
-      return { ok: true, workspace: refreshed.workspace };
+      try {
+        const { ensureCatalogAndSyncFeatures } = await import(
+          "@/modules/tasks/sync-server"
+        );
+        await ensureCatalogAndSyncFeatures({
+          workspaceId: loaded.workspaceId,
+          weddingId: loaded.weddingId,
+        });
+        const refreshed = await loadWorkspaceForUser();
+        return { ok: true, workspace: refreshed.workspace };
+      } catch (err) {
+        // Never block the app if catalog backfill fails.
+        console.error("ensureCatalogAndSyncFeatures failed", err);
+        return { ok: true, workspace: loaded.workspace };
+      }
     }
     return { ok: true, workspace: loaded.workspace };
   } catch (e) {
@@ -57,6 +63,32 @@ export async function getWorkspaceAction(): Promise<{
       return { ok: false, workspace: null, error: "UNAUTHORIZED" };
     }
     return { ok: false, workspace: null, error: msg };
+  }
+}
+
+/** Force-backfill the default checklist for the current wedding. */
+export async function ensureChecklistCatalogAction() {
+  try {
+    const ctx = await requireMembership([
+      "owner",
+      "partner",
+      "collaborator",
+      "viewer",
+    ]);
+    const { ensureCatalogAndSyncFeatures } = await import(
+      "@/modules/tasks/sync-server"
+    );
+    const result = await ensureCatalogAndSyncFeatures({
+      workspaceId: ctx.workspaceId,
+      weddingId: ctx.weddingId,
+    });
+    revalidatePath("/app/tasks");
+    revalidatePath("/app/dashboard");
+    return { ok: true as const, ...result };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "ERROR";
+    console.error("ensureChecklistCatalogAction failed", e);
+    return { ok: false as const, error: msg, added: 0, synced: 0 };
   }
 }
 
@@ -90,6 +122,17 @@ export async function completeOnboardingAction(input: {
   if (existing) {
     const wedding = existing.workspace.weddings[0];
     if (wedding?.onboardingDone) {
+      try {
+        const { ensureCatalogAndSyncFeatures } = await import(
+          "@/modules/tasks/sync-server"
+        );
+        await ensureCatalogAndSyncFeatures({
+          workspaceId: existing.workspaceId,
+          weddingId: wedding.id,
+        });
+      } catch (err) {
+        console.error("ensure on alreadyOnboarded failed", err);
+      }
       const { workspace } = await loadWorkspaceForUser();
       return {
         ok: true as const,
